@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Tailwind handles: 
+   - Reset & base styles
+   - Font-family
+   - Scroll behavior
+   - Utility classes (padding, margin, max-width, flex, grid, colors, shadows, rounded, etc.)
+*/
+
+/* Optional: Tailwind config colors (for custom primary colors) */
+@layer base {
+  :root {
+    --primary-50: #eff6ff;
+    --primary-100: #dbeafe;
+    --primary-500: #3b82f6;
+    --primary-600: #2563eb;
+    --primary-700: #1d4ed8;
+  }
+}
+
+/* Custom Animations using Tailwind @keyframes */
+@layer utilities {
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(0.25rem); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slide-in {
+    from { transform: translateX(-0.5rem); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+  }
+}
+
+/* Tailwind already provides:
+   - Cards: bg-white, shadow, rounded, border
+   - Buttons: px-4 py-2, rounded, font-medium, bg-blue-600, hover:bg-blue-700
+   - Badges: px-2 py-1, rounded-full, bg-green-100, text-green-700
+   - Scrollbars: can use 'scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100' via plugin
+   - Containers: max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8
+*/
