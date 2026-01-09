@@ -1,10 +1,10 @@
 /* eslint-disable no-prototype-builtins */
 /* eslint-disable no-unused-vars */
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Download, 
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import {
+  Search,
+  Filter,
+  Download,
   Eye,
   CreditCard,
   ArrowLeft,
@@ -59,12 +59,19 @@ import {
   CheckCircle2,
   CircleCheck,
   Circle,
-  AlertCircle as AlertCircleIcon
+  AlertCircle as AlertCircleIcon,
+  File,
+  Image,
+  FileIcon,
+  X as XIcon,
+  CloudUpload
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import axios from 'axios';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
 
@@ -123,12 +130,13 @@ const showConfirmDialog = (title, message, confirmText, cancelText) => {
 
 // Payment method mapping for bank transactions
 const getPaymentMethodFromBankTransaction = (description) => {
-  const desc = description.toLowerCase();
+  const desc = description?.toLowerCase() || '';
   if (desc.includes('upi') || desc.includes('qr')) return 'upi';
   if (desc.includes('neft') || desc.includes('rtgs') || desc.includes('imps')) return 'bank';
   if (desc.includes('card')) return 'card';
   if (desc.includes('cash')) return 'cash';
-  return 'bank'; // default to bank transfer
+  if (desc.includes('cheque') || desc.includes('check')) return 'cheque';
+  return 'bank';
 };
 
 const PaymentMethodBadge = ({ method }) => {
@@ -138,11 +146,20 @@ const PaymentMethodBadge = ({ method }) => {
     upi: { label: 'UPI', color: 'bg-purple-100 text-purple-800 border border-purple-200', icon: QrCode },
     cash: { label: 'Cash', color: 'bg-amber-100 text-amber-800 border border-amber-200', icon: Banknote },
     cheque: { label: 'Cheque', color: 'bg-gray-100 text-gray-800 border border-gray-200', icon: FileText },
-    bank: { label: 'Bank Transfer', color: 'bg-indigo-100 text-indigo-800 border border-indigo-200', icon: FileSpreadsheet }
+    bank: { label: 'Bank Transfer', color: 'bg-indigo-100 text-indigo-800 border border-indigo-200', icon: FileSpreadsheet },
+    ONLINE_BANKING: { label: 'Online Banking', color: 'bg-blue-100 text-blue-800 border border-blue-200', icon: CreditCard },
+    UPI: { label: 'UPI', color: 'bg-purple-100 text-purple-800 border border-purple-200', icon: QrCode },
+    CASH: { label: 'Cash', color: 'bg-amber-100 text-amber-800 border border-amber-200', icon: Banknote },
+    CHEQUE: { label: 'Cheque', color: 'bg-gray-100 text-gray-800 border border-gray-200', icon: FileText },
+    CREDIT_CARD: { label: 'Credit Card', color: 'bg-emerald-100 text-emerald-800 border border-emerald-200', icon: Card },
+    DEBIT_CARD: { label: 'Debit Card', color: 'bg-emerald-100 text-emerald-800 border border-emerald-200', icon: Card },
+    BANK_TRANSFER: { label: 'Bank Transfer', color: 'bg-indigo-100 text-indigo-800 border border-indigo-200', icon: FileSpreadsheet },
+    NEFT: { label: 'NEFT', color: 'bg-indigo-100 text-indigo-800 border border-indigo-200', icon: FileSpreadsheet },
+    RTGS: { label: 'RTGS', color: 'bg-indigo-100 text-indigo-800 border border-indigo-200', icon: FileSpreadsheet },
+    IMPS: { label: 'IMPS', color: 'bg-indigo-100 text-indigo-800 border border-indigo-200', icon: FileSpreadsheet }
   };
-  
+
   const { label, color, icon: Icon } = config[method] || config.bank;
-  
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${color}`}>
       <Icon className="w-3 h-3" />
@@ -157,11 +174,13 @@ const TransactionStatusBadge = ({ status }) => {
     pending: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock },
     unverified: { label: 'Unverified', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: AlertCircle },
     matched: { label: 'Matched', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Link },
-    unmatched: { label: 'Unmatched', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: Unlink }
+    unmatched: { label: 'Unmatched', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: Unlink },
+    UNVERIFIED: { label: 'Unverified', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: AlertCircle },
+    MATCHED: { label: 'Matched', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Link },
+    PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock }
   };
 
   const { label, color, icon: Icon } = config[status] || config.unverified;
-
   return (
     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${color}`}>
       <Icon className="w-3 h-3" />
@@ -173,7 +192,7 @@ const TransactionStatusBadge = ({ status }) => {
 const StatCard = ({ label, value, icon: Icon, color, trend, change }) => {
   const trendColor = change >= 0 ? 'text-emerald-600' : 'text-rose-600';
   const trendIcon = change >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />;
-  
+
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
@@ -214,7 +233,6 @@ const VerifiedStatusIndicator = ({ isVerified }) => {
       </div>
     );
   }
-  
   return (
     <div className="flex items-center gap-2">
       <AlertCircleIcon className="w-6 h-6 text-amber-500" />
@@ -223,11 +241,433 @@ const VerifiedStatusIndicator = ({ isVerified }) => {
   );
 };
 
+// API Service functions
+const transactionApi = axios.create({
+  baseURL: 'http://localhost:8080/api/transactions',
+});
+
+// Add request interceptor to add auth token
+transactionApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+const handleResponse = (response) => {
+  const responseData = response.data;
+  if (responseData && typeof responseData === 'object') {
+    if (responseData.success === false) {
+      throw new Error(responseData.message || 'Request failed');
+    }
+    return responseData.data || responseData;
+  }
+  return responseData;
+};
+
+const handleError = (error) => {
+  if (error.response) {
+    const errorData = error.response.data;
+    const errorMessage = errorData.message ||
+      errorData.error ||
+      errorData ||
+      'Request failed';
+    throw new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+  } else if (error.request) {
+    throw new Error('No response from server. Please check your connection.');
+  } else {
+    throw new Error(error.message || 'Request failed');
+  }
+};
+
+
+// Enhanced Import Modal Component with Glassmorphism
+// Enhanced Import Modal Component with Glassmorphism
+const ImportModal = ({ isOpen, onClose, onUpload, isLoading }) => {
+  const [file, setFile] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [preview, setPreview] = useState(null);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      processFile(selectedFile);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) {
+      processFile(droppedFile);
+    }
+  };
+
+  const processFile = (selectedFile) => {
+    setFile(selectedFile);
+    
+    // Check file size (max 10MB)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      showErrorAlert('File Too Large', 'File size should be less than 10MB');
+      return;
+    }
+
+    // Check file type
+    const validTypes = [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/json',
+      'text/plain'
+    ];
+
+    if (!validTypes.includes(selectedFile.type) && !selectedFile.name.match(/\.(csv|xlsx?|json|txt)$/i)) {
+      showErrorAlert('Invalid File Type', 'Please upload CSV, Excel, JSON, or text files only');
+      return;
+    }
+
+    // Create preview
+    if (selectedFile.type === 'application/json') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const jsonContent = JSON.parse(e.target.result);
+          setPreview({
+            type: 'json',
+            content: JSON.stringify(jsonContent, null, 2).substring(0, 500) + '...',
+            count: Array.isArray(jsonContent) ? jsonContent.length : 1
+          });
+        } catch (error) {
+          setPreview({
+            type: 'text',
+            content: 'Unable to parse JSON. Raw preview: ' + e.target.result.substring(0, 500) + '...'
+          });
+        }
+      };
+      reader.readAsText(selectedFile);
+    } else if (selectedFile.type.includes('csv') || selectedFile.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const lines = e.target.result.split('\n');
+        setPreview({
+          type: 'csv',
+          content: lines.slice(0, 5).join('\n'),
+          count: lines.length - 1 // Subtract header
+        });
+      };
+      reader.readAsText(selectedFile);
+    } else {
+      setPreview({
+        type: 'file',
+        name: selectedFile.name,
+        size: (selectedFile.size / 1024).toFixed(2) + ' KB'
+      });
+    }
+  };
+
+  const handleUpload = () => {
+    if (file) {
+      onUpload(file);
+      resetModal();
+    }
+  };
+
+  const resetModal = () => {
+    setFile(null);
+    setPreview(null);
+    onClose();
+  };
+
+  const getFileIcon = (fileName) => {
+    if (fileName?.endsWith('.csv')) return <FileText className="w-10 h-10 text-emerald-600" />;
+    if (fileName?.endsWith('.xlsx') || fileName?.endsWith('.xls')) return <FileSpreadsheet className="w-10 h-10 text-green-600" />;
+    if (fileName?.endsWith('.json')) return <FileText className="w-10 h-10 text-amber-600" />;
+    return <File className="w-10 h-10 text-blue-600" />;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      {/* Fixed full-screen backdrop with light glassmorphic effect */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 overflow-y-auto"
+      >
+        {/* Light semi-transparent glassmorphic backdrop */}
+        <div 
+          className="fixed inset-0 bg-linear-to-br from-white/40 via-gray-50/30 to-blue-50/20 backdrop-blur-md"
+          onClick={resetModal}
+        >
+          {/* Subtle background texture for glass effect */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-blue-100/10 rounded-full blur-3xl"></div>
+            <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-purple-100/10 rounded-full blur-3xl"></div>
+          </div>
+          
+          {/* Subtle grid pattern overlay */}
+          <div 
+            className="absolute inset-0 opacity-5"
+            style={{
+              backgroundImage: `linear-gradient(to right, #888 1px, transparent 1px),
+                                linear-gradient(to bottom, #888 1px, transparent 1px)`,
+              backgroundSize: '20px 20px',
+            }}
+          ></div>
+        </div>
+        
+        {/* Modal container positioned slightly lower */}
+        <div className="relative min-h-screen flex items-start justify-center p-4 pt-28 lg:pt-32">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+            transition={{ 
+              type: "spring", 
+              damping: 20, 
+              stiffness: 300,
+              delay: 0.1
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-2xl mt-4"
+          >
+            {/* Enhanced glassmorphic Modal Card */}
+            <div className="relative bg-linear-to-br from-white/95 via-white/92 to-white/95 backdrop-blur-xl rounded-2xl border border-white/50 shadow-2xl overflow-hidden"
+              style={{
+                boxShadow: `
+                  0 20px 40px -12px rgba(0, 0, 0, 0.15),
+                  0 8px 24px 0 rgba(149, 157, 165, 0.2),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.8),
+                  inset 0 -1px 0 rgba(0, 0, 0, 0.05)
+                `,
+              }}
+            >
+              {/* Subtle border glow */}
+              <div className="absolute inset-0 rounded-2xl pointer-events-none border border-white/30"></div>
+              
+              {/* Header */}
+              <div className="p-6 border-b border-gray-100/50 bg-linear-to-r from-white/60 via-white/40 to-white/60">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-linear-to-br from-blue-100/50 to-blue-200/50 backdrop-blur-sm rounded-xl">
+                      <Upload className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-800">
+                        Import Bank Statement
+                      </h2>
+                      <p className="text-gray-600 mt-1">Upload CSV, Excel, or JSON files from your bank</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={resetModal}
+                    className="p-2 hover:bg-white/60 rounded-full transition-colors backdrop-blur-sm"
+                  >
+                    <XIcon className="w-5 h-5 text-gray-600" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                {/* File Upload Area */}
+                <div className="mb-8">
+                  <div
+                    className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
+                      dragOver
+                        ? 'border-blue-400 bg-blue-50/50 scale-[1.02] backdrop-blur-sm'
+                        : 'border-gray-300/60 hover:border-blue-300/60 hover:bg-gray-50/40 backdrop-blur-sm'
+                    }`}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.04) 100%)',
+                    }}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                    <input
+                      type="file"
+                      id="file-upload"
+                      className="hidden"
+                      onChange={handleFileChange}
+                      accept=".csv,.xlsx,.xls,.json,.txt"
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <div className="flex flex-col items-center">
+                        <div className="p-4 bg-linear-to-br from-blue-50/70 to-blue-100/70 backdrop-blur-sm rounded-full mb-4">
+                          <CloudUpload className="w-12 h-12 text-blue-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                          {file ? 'File Selected' : 'Drag & Drop or Click to Upload'}
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                          {file ? file.name : 'Supports CSV, Excel, JSON files up to 10MB'}
+                        </p>
+                        {!file && (
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="px-6 py-3 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium shadow-lg shadow-blue-400/20 hover:shadow-xl hover:shadow-blue-400/30 transition-all"
+                          >
+                            Browse Files
+                          </motion.div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* File Preview */}
+                {file && preview && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-8"
+                  >
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">File Preview</h3>
+                    <div className="bg-white/80 backdrop-blur-sm rounded-lg border border-gray-200/40 p-6 shadow-sm">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                          {getFileIcon(file.name)}
+                          <div>
+                            <h4 className="font-medium text-gray-800">{file.name}</h4>
+                            <p className="text-sm text-gray-600">
+                              {(file.size / 1024).toFixed(2)} KB • {preview.count ? `${preview.count} records` : 'Processing...'}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setFile(null);
+                            setPreview(null);
+                          }}
+                          className="p-2 hover:bg-white/60 rounded-full backdrop-blur-sm"
+                        >
+                          <XIcon className="w-5 h-5 text-gray-500" />
+                        </button>
+                      </div>
+
+                      {/* Preview Content */}
+                      {preview.content && (
+                        <div className="mt-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileSearch className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium text-gray-700">Preview</span>
+                          </div>
+                          <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-60 shadow-inner border border-gray-200/30">
+                            <pre className="text-sm text-gray-700 font-mono whitespace-pre-wrap">
+                              {preview.content}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Supported Formats */}
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3">Supported Formats</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/40">
+                      <FileText className="w-5 h-5 text-emerald-500" />
+                      <span className="text-sm font-medium">CSV</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/40">
+                      <FileSpreadsheet className="w-5 h-5 text-green-500" />
+                      <span className="text-sm font-medium">Excel</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/40">
+                      <FileText className="w-5 h-5 text-amber-500" />
+                      <span className="text-sm font-medium">JSON</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                <div className="bg-linear-to-r from-blue-50/70 to-indigo-50/70 backdrop-blur-sm rounded-lg p-4 border border-blue-100/50">
+                  <h4 className="font-semibold text-blue-800 mb-2">📋 Import Instructions</h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• Ensure file has columns: Date, Description, Amount, Reference</li>
+                    <li>• Remove any header rows or footers from the statement</li>
+                    <li>• Date format should be YYYY-MM-DD or DD/MM/YYYY</li>
+                    <li>• Amount should be numeric (₹ symbol will be removed)</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-100/50 bg-linear-to-r from-transparent via-white/50 to-transparent">
+                <div className="flex gap-3">
+                  <button
+                    onClick={resetModal}
+                    disabled={isLoading}
+                    className="flex-1 px-4 py-3 bg-white/80 hover:bg-white text-gray-700 rounded-lg border border-gray-300/60 backdrop-blur-sm transition-all text-sm font-medium hover:shadow-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleUpload}
+                    disabled={!file || isLoading}
+                    className="flex-1 px-4 py-3 bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-400/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium hover:shadow-xl hover:shadow-emerald-400/30"
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Importing...
+                      </span>
+                    ) : (
+                      'Import File'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const Transactions = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const studentIdParam = queryParams.get('student');
+  const { showAlert } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
   const [dateRange, setDateRange] = useState('today');
@@ -235,221 +675,146 @@ const Transactions = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransactions, setSelectedTransactions] = useState([]);
   const [viewMode, setViewMode] = useState('list');
-  const [activeTab, setActiveTab] = useState('verified'); // 'verified', 'unverified', 'all'
+  const [activeTab, setActiveTab] = useState('unverified');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState(null);
 
-  // Bank statement data (imported from bank)
-  const [bankStatements, setBankStatements] = useState([
-    {
-      id: 'BANK001',
-      date: '2025-03-20',
-      description: 'UPI-ROHAN KUMAR-SCHOOL FEE',
-      amount: 45000,
-      reference: 'UPI123456789',
-      bankAccount: 'XXXXXX1234',
-      status: 'matched', // matched, unmatched, pending
-      matchedStudentId: 1,
-      matchedStudentName: 'Rohan Kumar',
-      verified: true
-    },
-    {
-      id: 'BANK002',
-      date: '2025-03-20',
-      description: 'NEFT-ANJALI SINGH-FEE PAYMENT',
-      amount: 22500,
-      reference: 'NEFT987654321',
-      bankAccount: 'XXXXXX5678',
-      status: 'matched',
-      matchedStudentId: 2,
-      matchedStudentName: 'Anjali Singh',
-      verified: true
-    },
-    {
-      id: 'BANK003',
-      date: '2025-03-19',
-      description: 'CASH DEPOSIT-PRIYA SHARMA',
-      amount: 45000,
-      reference: 'CASH001',
-      bankAccount: 'XXXXXX9012',
-      status: 'unmatched',
-      matchedStudentId: null,
-      matchedStudentName: null,
-      verified: false
-    },
-    {
-      id: 'BANK004',
-      date: '2025-03-19',
-      description: 'IMPS-VIKRAM PATEL-SCHOOL',
-      amount: 30000,
-      reference: 'IMPS456789',
-      bankAccount: 'XXXXXX3456',
-      status: 'unmatched',
-      matchedStudentId: null,
-      matchedStudentName: null,
-      verified: false
-    },
-    {
-      id: 'BANK005',
-      date: '2025-03-18',
-      description: 'UPI-ARJUN MEHTA-FEE',
-      amount: 15000,
-      reference: 'UPI789012345',
-      bankAccount: 'XXXXXX7890',
-      status: 'pending',
-      matchedStudentId: 5,
-      matchedStudentName: 'Arjun Mehta',
-      verified: false
-    }
-  ]);
+  // State for backend data
+  const [bankStatements, setBankStatements] = useState([]);
+  const [verifiedTransactions, setVerifiedTransactions] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [pagination, setPagination] = useState({
+    page: 0,
+    size: 20,
+    totalPages: 0,
+    totalElements: 0
+  });
 
-  // Student data
-  const [students, setStudents] = useState([
-    { 
-      id: 1, 
-      name: 'Rohan Kumar', 
-      class: 'Grade 10A', 
-      guardian: 'Mr. Kumar', 
-      contact: '9876543210', 
-      email: 'rohan@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 45000,
-      pending: 0,
-      status: 'paid',
-      lastPayment: '2025-03-20',
-      remindersSent: 0,
-      lastReminder: null
-    },
-    { 
-      id: 2, 
-      name: 'Anjali Singh', 
-      class: 'Grade 10A', 
-      guardian: 'Mrs. Singh', 
-      contact: '9876543211', 
-      email: 'anjali@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 22500,
-      pending: 22500,
-      status: 'partial',
-      lastPayment: '2025-03-20',
-      remindersSent: 1,
-      lastReminder: '2025-03-18'
-    },
-    { 
-      id: 3, 
-      name: 'Vikram Patel', 
-      class: 'Grade 10B', 
-      guardian: 'Mr. Patel', 
-      contact: '9876543212', 
-      email: 'vikram@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-10',
-      paid: 0,
-      pending: 45000,
-      status: 'overdue',
-      lastPayment: null,
-      remindersSent: 3,
-      lastReminder: '2025-03-20'
-    },
-    { 
-      id: 4, 
-      name: 'Priya Sharma', 
-      class: 'Grade 11A', 
-      guardian: 'Mrs. Sharma', 
-      contact: '9876543213', 
-      email: 'priya@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 45000,
-      pending: 0,
-      status: 'paid',
-      lastPayment: '2025-03-19',
-      remindersSent: 0,
-      lastReminder: null
-    },
-    { 
-      id: 5, 
-      name: 'Arjun Mehta', 
-      class: 'Grade 11B', 
-      guardian: 'Mr. Mehta', 
-      contact: '9876543214', 
-      email: 'arjun@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 15000,
-      pending: 30000,
-      status: 'partial',
-      lastPayment: '2025-03-18',
-      remindersSent: 2,
-      lastReminder: '2025-03-15'
-    },
-  ]);
+  // Fetch data from backend
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Fetch bank transactions
+      const bankResponse = await transactionApi.get('/bank', {
+        params: { page: 0, size: 100 }
+      });
+      const bankData = handleResponse(bankResponse);
+      setBankStatements(Array.isArray(bankData) ? bankData : (bankData.content || []));
 
-  // Verified transactions (processed from bank statements)
-  const [verifiedTransactions, setVerifiedTransactions] = useState([
-    {
-      id: 1,
-      studentId: 1,
-      studentName: 'Rohan Kumar',
-      class: 'Grade 10A',
-      amount: 45000,
-      method: 'upi',
-      date: '2025-03-20 14:30',
-      receipt: 'RC-001',
-      bankReference: 'BANK001',
-      verified: true,
-      verifiedBy: 'Admin',
-      verifiedDate: '2025-03-20 15:00',
-      smsSent: true,
-      smsDate: '2025-03-20 15:05',
-      notes: 'Full payment received via UPI'
-    },
-    {
-      id: 2,
-      studentId: 2,
-      studentName: 'Anjali Singh',
-      class: 'Grade 10A',
-      amount: 22500,
-      method: 'bank',
-      date: '2025-03-20 12:45',
-      receipt: 'RC-002',
-      bankReference: 'BANK002',
-      verified: true,
-      verifiedBy: 'Admin',
-      verifiedDate: '2025-03-20 13:15',
-      smsSent: true,
-      smsDate: '2025-03-20 13:20',
-      notes: 'Partial payment - 1st installment via NEFT'
+      // Fetch verified transactions
+      const verifiedResponse = await transactionApi.get('/verified', {
+        params: { page: 0, size: 100 }
+      });
+      const verifiedData = handleResponse(verifiedResponse);
+      setVerifiedTransactions(Array.isArray(verifiedData) ? verifiedData : (verifiedData.content || []));
+
+      // Fetch students from StudentDTO API (enhanced with fee info)
+      try {
+        const studentsResponse = await axios.get('http://localhost:8080/api/v1/students', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const studentsData = studentsResponse.data;
+        
+        // The backend now returns List<StudentDTO> directly
+        const formattedStudents = (Array.isArray(studentsData) ? studentsData : []).map(dto => ({
+          id: dto.id,
+          studentId: dto.studentId,
+          fullName: dto.fullName,
+          grade: dto.grade,
+          phone: dto.phone,
+          email: dto.email,
+          address: dto.address,
+          emergencyContactName: dto.emergencyContactName,
+          emergencyContactPhone: dto.emergencyContactPhone,
+          emergencyRelation: dto.emergencyRelation,
+
+          // ✅ Use NEW fee fields from backend
+          totalFee: dto.totalFee || 0,
+          paidAmount: dto.paidAmount || 0,
+          pendingAmount: dto.pendingAmount !== undefined 
+            ? dto.pendingAmount 
+            : Math.max(0, (dto.totalFee || 0) - (dto.paidAmount || 0)),
+          feeStatus: dto.feeStatus || 'PENDING',
+
+          // Fee breakdown
+          tuitionFee: dto.tuitionFee || 0,
+          admissionFee: dto.admissionFee || 0,
+          examinationFee: dto.examinationFee || 0,
+          otherFees: dto.otherFees || 0,
+
+          // Transport
+          transportMode: dto.transportMode,
+          transportFee: dto.transportFee || 0,
+          transportFeeStatus: dto.transportFeeStatus || 'PENDING',
+
+          // Compatibility alias
+          contact: dto.phone || dto.emergencyContactPhone,
+
+          // Related data (if fetched via JOIN)
+          familyMembers: dto.familyMembers || [],
+          medicalRecords: dto.medicalRecords || [],
+          achievements: dto.achievements || [],
+          clubs: dto.clubs || [],
+          hobbies: dto.hobbies || []
+        }));
+
+        setStudents(formattedStudents);
+        console.log(`✅ Loaded ${formattedStudents.length} students with real fee data`);
+
+      } catch (studentError) {
+        console.error('Error fetching students from /api/v1/students:', studentError);
+        // REMOVED MOCK DATA - Only use real backend data
+        showErrorAlert('Student Data Error', 'Failed to load student data from server');
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      showAlert('error', 'Failed to load data', error.message);
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  }, [showAlert]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Filter transactions based on active tab
   const filteredTransactions = useMemo(() => {
     let transactions = [];
-    
     if (activeTab === 'verified') {
       transactions = verifiedTransactions;
     } else if (activeTab === 'unverified') {
-      transactions = bankStatements.filter(stmt => !stmt.verified);
+      // Filter bank statements that are not verified and not matched
+      transactions = bankStatements.filter(stmt =>
+        (!stmt.isVerified || stmt.isVerified === false) &&
+        (stmt.status === 'UNVERIFIED' || stmt.status === 'PENDING')
+      );
     } else {
       transactions = [...verifiedTransactions, ...bankStatements];
     }
-    
+
     // Filter by student if studentId param exists
     if (studentIdParam) {
-      transactions = transactions.filter(t => t.studentId === parseInt(studentIdParam));
+      transactions = transactions.filter(t => t.student?.id === parseInt(studentIdParam) || t.studentId === parseInt(studentIdParam));
     }
-    
-    // Apply other filters
-    return transactions.filter(transaction => {
-      const matchesSearch = searchQuery === '' || 
-        [transaction.studentName, transaction.description, transaction.reference, transaction.bankReference]
-          .some(field => field?.toLowerCase().includes(searchQuery.toLowerCase()));
-      
-      return matchesSearch;
-    });
+
+    // Apply search filter
+    if (searchQuery) {
+      transactions = transactions.filter(transaction => {
+        const searchLower = searchQuery.toLowerCase();
+        return (
+          (transaction.student?.fullName || transaction.studentName || '').toLowerCase().includes(searchLower) ||
+          (transaction.description || '').toLowerCase().includes(searchLower) ||
+          (transaction.referenceNumber || transaction.receiptNumber || '').toLowerCase().includes(searchLower) ||
+          (transaction.bankReference || '').toLowerCase().includes(searchLower) ||
+          String(transaction.amount || '').includes(searchQuery)
+        );
+      });
+    }
+
+    return transactions;
   }, [activeTab, studentIdParam, searchQuery, verifiedTransactions, bankStatements]);
 
   // Get student data
@@ -460,41 +825,52 @@ const Transactions = () => {
   // Handle file import
   const handleUpload = async (file) => {
     if (!file) return;
-    
     setIsLoading(true);
     try {
-      // Simulate parsing CSV/Excel file
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const formData = new FormData();
+      formData.append('file', file);
       
-      // Parse the file (in real app, you'd use PapaParse or similar)
-      const newStatements = [
-        {
-          id: `BANK${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
-          description: `NEW IMPORT - ${file.name}`,
-          amount: Math.floor(Math.random() * 50000) + 10000,
-          reference: `REF${Math.floor(Math.random() * 1000000)}`,
-          bankAccount: 'XXXXXX0000',
-          status: 'unmatched',
-          matchedStudentId: null,
-          matchedStudentName: null,
-          verified: false
-        }
-      ];
+      const response = await transactionApi.post('/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       
-      setBankStatements(prev => [...newStatements, ...prev]);
+      const importedData = handleResponse(response);
+      setBankStatements(prev => [...importedData, ...prev]);
       setShowImportModal(false);
       setImportFile(null);
       
       showSuccessAlert(
         'File Imported!',
-        `Successfully imported ${newStatements.length} transactions from bank statement.`
+        `Successfully imported ${importedData.length} transactions from bank statement.`
       );
-      
     } catch (error) {
-      showErrorAlert('Import Failed', 'Failed to import bank statement file.');
+      console.error('Import error:', error);
+      showErrorAlert('Import Failed', error.message || 'Failed to import bank statement file.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Match bank transaction to student
+  const handleMatchTransaction = async (transactionId, studentId) => {
+    try {
+      const response = await transactionApi.post(`/bank/${transactionId}/match/${studentId}`);
+      const updatedTransaction = handleResponse(response);
+      
+      // Update bank statements
+      setBankStatements(prev =>
+        prev.map(stmt =>
+          stmt.id === transactionId ? updatedTransaction : stmt
+        )
+      );
+      
+      // Refresh data
+      fetchData();
+      showSuccessAlert('Transaction Matched!', 'Transaction successfully matched with student.');
+    } catch (error) {
+      showErrorAlert('Match Failed', error.message || 'Failed to match transaction.');
     }
   };
 
@@ -523,15 +899,16 @@ const Transactions = () => {
                 <TransactionStatusBadge status={bankTransaction?.status || 'unverified'} />
               </div>
             </div>
-            
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div>
                 <p className="text-xs text-gray-500">Date</p>
-                <p className="text-sm font-medium">{bankTransaction?.date || 'N/A'}</p>
+                <p className="text-sm font-medium">
+                  {bankTransaction?.transactionDate ? new Date(bankTransaction.transactionDate).toLocaleDateString() : 'N/A'}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Reference</p>
-                <p className="text-sm font-medium font-mono">{bankTransaction?.reference || 'N/A'}</p>
+                <p className="text-sm font-medium font-mono">{bankTransaction?.referenceNumber || 'N/A'}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-xs text-gray-500">Description</p>
@@ -545,15 +922,17 @@ const Transactions = () => {
             <h4 className="font-semibold text-gray-900 mb-3">Select Student</h4>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <select 
+              <select
                 id="studentSelect"
                 className="w-full border border-gray-300 rounded-lg px-10 py-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                defaultValue={bankTransaction?.matchedStudentId || ""}
+                defaultValue={bankTransaction?.student?.id || ""}
               >
                 <option value="">Search and select student...</option>
                 {students.map(student => (
                   <option key={student.id} value={student.id}>
-                    {student.name} ({student.class}) - Parent: {student.guardian} - Pending: ₹{student.pending.toLocaleString()}
+                    {student.fullName} ({student.grade}) - 
+                    ID: {student.studentId} - 
+                    Pending: ₹{student.pendingAmount.toLocaleString()}
                   </option>
                 ))}
               </select>
@@ -570,8 +949,13 @@ const Transactions = () => {
                   }}
                   className="p-2 border border-gray-200 rounded-lg text-left hover:bg-gray-50"
                 >
-                  <p className="text-xs font-medium">{student.name}</p>
-                  <p className="text-xs text-gray-500">Pending: ₹{student.pending.toLocaleString()}</p>
+                  <p className="text-xs font-medium truncate">{student.fullName}</p>
+                  <p className="text-xs text-gray-500">
+                    ID: {student.studentId}
+                  </p>
+                  <p className="text-xs text-amber-600">
+                    Pending: ₹{student.pendingAmount.toLocaleString()}
+                  </p>
                 </button>
               ))}
             </div>
@@ -580,7 +964,6 @@ const Transactions = () => {
           {/* Payment Details */}
           <div className="space-y-4">
             <h4 className="font-semibold text-gray-900">Payment Details</h4>
-            
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -598,7 +981,6 @@ const Transactions = () => {
                   Bank transaction amount (read-only)
                 </p>
               </div>
-              
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Payment Method
@@ -608,16 +990,20 @@ const Transactions = () => {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   defaultValue={bankTransaction ? getPaymentMethodFromBankTransaction(bankTransaction.description) : 'bank'}
                 >
-                  <option value="online">Online Banking</option>
-                  <option value="card">Credit/Debit Card</option>
-                  <option value="upi">UPI</option>
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="bank">Bank Transfer</option>
+                  <option value="ONLINE_BANKING">Online Banking</option>
+                  <option value="CREDIT_CARD">Credit Card</option>
+                  <option value="DEBIT_CARD">Debit Card</option>
+                  <option value="UPI">UPI</option>
+                  <option value="CASH">Cash</option>
+                  <option value="CHEQUE">Cheque</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="NEFT">NEFT</option>
+                  <option value="RTGS">RTGS</option>
+                  <option value="IMPS">IMPS</option>
                 </select>
               </div>
             </div>
-
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -627,10 +1013,9 @@ const Transactions = () => {
                   type="date"
                   id="paymentDate"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  defaultValue={bankTransaction?.date || new Date().toISOString().split('T')[0]}
+                  defaultValue={bankTransaction?.transactionDate ? new Date(bankTransaction.transactionDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                 />
               </div>
-              
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Receipt Number
@@ -644,7 +1029,7 @@ const Transactions = () => {
                 />
               </div>
             </div>
-
+            
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Notes (Optional)
@@ -665,7 +1050,6 @@ const Transactions = () => {
               <h4 className="font-semibold text-gray-900">SMS Notification</h4>
               <span className="text-xs text-gray-500">Send confirmation to parent</span>
             </div>
-            
             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex items-center gap-2">
@@ -679,14 +1063,12 @@ const Transactions = () => {
                   className="rounded text-blue-600"
                 />
               </label>
-              
               <div id="smsPreview" className="mt-3 p-2 bg-white rounded border border-gray-300 text-sm">
                 <p className="text-gray-600">SMS Preview:</p>
                 <p className="font-medium mt-1">
-                  Dear Parent, payment of ₹{bankTransaction?.amount?.toLocaleString() || '0'} received for {bankTransaction?.matchedStudentName || 'Student'}. Receipt: RC-{String(verifiedTransactions.length + 1).padStart(3, '0')}. Thank you!
+                  Dear Parent, payment of ₹{bankTransaction?.amount?.toLocaleString() || '0'} received for {bankTransaction?.student?.fullName || 'Student'}. Receipt: RC-{String(verifiedTransactions.length + 1).padStart(3, '0')}. Thank you!
                 </p>
               </div>
-              
               <div className="mt-2 text-xs text-gray-500">
                 SMS will be sent to parent's mobile number after verification
               </div>
@@ -699,7 +1081,7 @@ const Transactions = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Bank Transaction</span>
-                <span className="font-medium">{bankTransaction?.reference || 'New'}</span>
+                <span className="font-medium">{bankTransaction?.referenceNumber || 'New'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Amount</span>
@@ -743,15 +1125,14 @@ const Transactions = () => {
         }
         
         const selectedStudent = students.find(s => s.id === parseInt(selectedStudentId));
-        
         return {
           studentId: parseInt(selectedStudentId),
-          studentName: selectedStudent.name,
+          studentName: selectedStudent.fullName,
           guardianContact: selectedStudent.contact,
           amount: bankTransaction?.amount || parseFloat(document.getElementById('paymentAmount').value),
           method: document.getElementById('paymentMethod').value,
           date: document.getElementById('paymentDate').value,
-          receipt: document.getElementById('receiptNumber').value,
+          receiptNumber: document.getElementById('receiptNumber').value,
           notes: document.getElementById('paymentNotes').value,
           sendSMS: sendSMS,
           bankTransactionId: bankTransaction?.id,
@@ -769,101 +1150,51 @@ const Transactions = () => {
   const processPaymentVerification = async (formValues, bankTransaction) => {
     setIsLoading(true);
     try {
-      // 1. Update bank statement status
       if (bankTransaction && formValues.isNewMatch) {
-        const updatedBankStatements = bankStatements.map(stmt => 
-          stmt.id === bankTransaction.id 
-            ? { 
-                ...stmt, 
-                status: 'matched',
-                matchedStudentId: formValues.studentId,
-                matchedStudentName: formValues.studentName,
-                verified: true
-              }
-            : stmt
-        );
-        setBankStatements(updatedBankStatements);
-      }
-
-      // 2. Create verified transaction record
-      const newTransaction = {
-        id: verifiedTransactions.length + 1,
-        studentId: formValues.studentId,
-        studentName: formValues.studentName,
-        class: students.find(s => s.id === formValues.studentId)?.class || '',
-        amount: formValues.amount,
-        method: formValues.method,
-        date: `${formValues.date} ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
-        receipt: formValues.receipt,
-        bankReference: bankTransaction?.reference || 'N/A',
-        verified: true,
-        verifiedBy: 'Admin',
-        verifiedDate: new Date().toLocaleString('en-IN'),
-        smsSent: formValues.sendSMS,
-        smsDate: formValues.sendSMS ? new Date().toLocaleString('en-IN') : null,
-        notes: formValues.notes
-      };
-
-      setVerifiedTransactions(prev => [newTransaction, ...prev]);
-
-      // 3. Update student data
-      const updatedStudents = students.map(student => {
-        if (student.id === formValues.studentId) {
-          const newPaidAmount = student.paid + formValues.amount;
-          const newPendingAmount = Math.max(0, student.totalFee - newPaidAmount);
-          
-          let newStatus = student.status;
-          if (newPendingAmount <= 0) {
-            newStatus = 'paid';
-          } else if (newPaidAmount > 0) {
-            newStatus = 'partial';
-          }
-          
-          // Check if overdue
-          const today = new Date();
-          const dueDate = new Date(student.dueDate);
-          if (newStatus !== 'paid' && today > dueDate) {
-            newStatus = 'overdue';
-          }
-          
-          return {
-            ...student,
-            paid: newPaidAmount,
-            pending: newPendingAmount,
-            status: newStatus,
-            lastPayment: new Date().toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })
-          };
+        // Match bank transaction to student
+        await handleMatchTransaction(bankTransaction.id, formValues.studentId);
+        
+        // Verify payment
+        const verificationRequest = {
+          bankTransactionId: bankTransaction.id,
+          studentId: formValues.studentId,
+          amount: formValues.amount,
+          paymentMethod: formValues.method,
+          paymentDate: formValues.date,
+          receiptNumber: formValues.receiptNumber,
+          notes: formValues.notes
+        };
+        
+        const response = await transactionApi.post('/verify', verificationRequest);
+        const verifiedTransaction = handleResponse(response);
+        
+        // Update verified transactions
+        setVerifiedTransactions(prev => [verifiedTransaction, ...prev]);
+        
+        // Send SMS if requested
+        if (formValues.sendSMS) {
+          await sendPaymentConfirmationSMS(
+            formValues.guardianContact,
+            formValues.studentName,
+            formValues.amount,
+            formValues.receiptNumber
+          );
         }
-        return student;
-      });
-
-      setStudents(updatedStudents);
-
-      // 4. Send SMS if requested
-      if (formValues.sendSMS) {
-        await sendPaymentConfirmationSMS(
-          formValues.guardianContact,
-          formValues.studentName,
-          formValues.amount,
-          formValues.receipt
+        
+        showSuccessAlert(
+          'Payment Verified Successfully!',
+          `Payment of ₹${formValues.amount.toLocaleString()} verified for ${formValues.studentName}. ${
+            formValues.sendSMS ? 'SMS confirmation sent to parent.' : ''
+          }`
         );
+        
+        // Refresh data
+        fetchData();
       }
-
-      showSuccessAlert(
-        'Payment Verified Successfully!',
-        `Payment of ₹${formValues.amount.toLocaleString()} verified for ${formValues.studentName}. ${
-          formValues.sendSMS ? 'SMS confirmation sent to parent.' : ''
-        }`
-      );
-
     } catch (error) {
       showErrorAlert(
         'Verification Failed',
-        'There was an error processing the payment verification.'
+        error.message || 'There was an error processing the payment verification.'
       );
     } finally {
       setIsLoading(false);
@@ -873,26 +1204,40 @@ const Transactions = () => {
   // Send SMS confirmation
   const sendPaymentConfirmationSMS = async (contact, studentName, amount, receipt) => {
     try {
-      // Simulate API call to SMS gateway
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const smsMessage = `Dear Parent, payment of ₹${amount.toLocaleString()} received for ${studentName}. Receipt: ${receipt}. Thank you! - School`;
-      
-      console.log('SMS sent to', contact, ':', smsMessage);
-      
+      const student = students.find(s => s.fullName === studentName);
+      if (!student) {
+        console.warn('Student not found for SMS:', studentName);
+        return false;
+      }
+
+      const recipient = contact || student.phone || student.emergencyContactPhone;
+      if (!recipient) {
+        console.warn('No valid phone number for student:', studentName);
+        return false;
+      }
+
+      const smsRequest = {
+        studentId: student.id,
+        message: `Dear Parent/Guardian, payment of ₹${amount.toLocaleString()} received for ${studentName} (${student.grade}). Receipt: ${receipt}. Thank you! - School Management System`,
+        recipientPhone: recipient
+      };
+
+      const response = await transactionApi.post('/sms/send', smsRequest);
+      handleResponse(response);
+      console.log('✅ SMS sent to', recipient);
       return true;
     } catch (error) {
-      console.error('Failed to send SMS:', error);
+      console.error('❌ SMS failed:', error.message || error);
       return false;
     }
   };
 
   // Handle view transaction details
   const handleViewTransactionDetails = (transaction) => {
-    const isBankTransaction = transaction.hasOwnProperty('bankAccount');
-    const student = isBankTransaction 
-      ? students.find(s => s.id === transaction.matchedStudentId)
-      : getStudentData(transaction.studentId);
+    const isBankTransaction = transaction.hasOwnProperty('bankAccount') || transaction.hasOwnProperty('referenceNumber');
+    const student = isBankTransaction
+      ? students.find(s => s.id === transaction.student?.id)
+      : getStudentData(transaction.student?.id || transaction.studentId);
 
     MySwal.fire({
       title: <span className="text-gray-900">Transaction Details</span>,
@@ -913,35 +1258,38 @@ const Transactions = () => {
                 </>
               )}
             </div>
-            <TransactionStatusBadge status={isBankTransaction ? transaction.status : 'verified'} />
+            <TransactionStatusBadge status={isBankTransaction ? (transaction.status || 'unverified') : 'verified'} />
           </div>
 
           {/* Transaction Details */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-gray-500">Reference Number</p>
-              <p className="text-sm font-mono font-medium">{transaction.reference || transaction.bankReference}</p>
+              <p className="text-sm font-mono font-medium">{transaction.referenceNumber || transaction.receiptNumber || 'N/A'}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Date</p>
-              <p className="text-sm font-medium">{transaction.date}</p>
+              <p className="text-sm font-medium">
+                {transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleDateString() :
+                 transaction.paymentDate ? new Date(transaction.paymentDate).toLocaleDateString() : 'N/A'}
+              </p>
             </div>
             <div className="col-span-2">
               <p className="text-xs text-gray-500">Description</p>
-              <p className="text-sm font-medium">{transaction.description || transaction.receipt}</p>
+              <p className="text-sm font-medium">{transaction.description || transaction.receiptNumber || 'N/A'}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Amount</p>
-              <p className="text-xl font-bold text-gray-900">₹{transaction.amount.toLocaleString()}</p>
+              <p className="text-xl font-bold text-gray-900">₹{transaction.amount?.toLocaleString() || '0'}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Payment Method</p>
               <div className="mt-1">
-                <PaymentMethodBadge 
-                  method={isBankTransaction 
+                <PaymentMethodBadge
+                  method={isBankTransaction
                     ? getPaymentMethodFromBankTransaction(transaction.description)
-                    : transaction.method
-                  } 
+                    : transaction.paymentMethod
+                  }
                 />
               </div>
             </div>
@@ -954,20 +1302,23 @@ const Transactions = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-gray-500">Student Name</p>
-                  <p className="text-sm font-medium">{student.name}</p>
+                  <p className="text-sm font-medium">{student.fullName}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Class</p>
-                  <p className="text-sm font-medium">{student.class}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Guardian</p>
-                  <p className="text-sm font-medium">{student.guardian}</p>
+                  <p className="text-sm font-medium">{student.grade}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Contact</p>
-                  <p className="text-sm font-medium">{student.contact}</p>
+                  <p className="text-sm font-medium">{student.phone || student.contact || 'No phone'}</p>
                 </div>
+                {student.feeStatus === 'PENDING' && student.pendingAmount > 0 && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-amber-600">
+                      Pending: ₹{student.pendingAmount.toLocaleString()}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -975,11 +1326,11 @@ const Transactions = () => {
           {/* Additional Info */}
           {transaction.verifiedBy && (
             <div className="text-sm text-gray-600">
-              <p>Verified by: {transaction.verifiedBy}</p>
-              <p>Verified on: {transaction.verifiedDate}</p>
+              <p>Verified by: {transaction.verifiedBy?.fullName || transaction.verifiedBy}</p>
+              <p>Verified on: {transaction.verifiedAt ? new Date(transaction.verifiedAt).toLocaleDateString() : 'N/A'}</p>
             </div>
           )}
-
+          
           {transaction.smsSent && (
             <div className="flex items-center gap-2 text-sm text-emerald-600">
               <MessageSquare className="w-4 h-4" />
@@ -1000,10 +1351,11 @@ const Transactions = () => {
 
   // Handle bulk verification
   const handleBulkVerify = async () => {
-    const selectedBankTransactions = bankStatements.filter(stmt => 
-      selectedTransactions.includes(stmt.id) && !stmt.verified
+    const selectedBankTransactions = bankStatements.filter(stmt =>
+      selectedTransactions.includes(stmt.id) &&
+      (!stmt.isVerified || stmt.isVerified === false)
     );
-    
+
     if (selectedBankTransactions.length === 0) {
       showErrorAlert('No Selection', 'Please select unverified bank transactions to verify.');
       return;
@@ -1015,40 +1367,40 @@ const Transactions = () => {
       'Verify All',
       'Cancel'
     );
-    
+
     if (result.isConfirmed) {
       setIsLoading(true);
       try {
-        // For each selected transaction, process verification
-        for (const transaction of selectedBankTransactions) {
-          // Find a likely student match based on description
-          const likelyStudent = students.find(student => 
-            transaction.description.toLowerCase().includes(student.name.toLowerCase().split(' ')[0])
-          );
-          
-          if (likelyStudent) {
-            const formValues = {
-              studentId: likelyStudent.id,
-              studentName: likelyStudent.name,
-              guardianContact: likelyStudent.contact,
-              amount: transaction.amount,
-              method: getPaymentMethodFromBankTransaction(transaction.description),
-              date: transaction.date,
-              receipt: `RC-${String(verifiedTransactions.length + 1).padStart(3, '0')}`,
-              notes: 'Auto-verified from bank statement',
-              sendSMS: true,
-              bankTransactionId: transaction.id,
-              isNewMatch: true
-            };
-            
-            await processPaymentVerification(formValues, transaction);
+        const bulkRequest = {
+          bankTransactionIds: selectedBankTransactions.map(t => t.id),
+          verificationData: {
+            paymentMethod: 'BANK_TRANSFER',
+            notes: 'Bulk verified from bank statements'
           }
-        }
+        };
+
+        const response = await transactionApi.post('/bulk-verify', bulkRequest);
+        const verifiedTransactions = handleResponse(response);
+        
+        // Update state
+        setVerifiedTransactions(prev => [...verifiedTransactions, ...prev]);
+        
+        // Update bank statements
+        setBankStatements(prev =>
+          prev.map(stmt =>
+            selectedBankTransactions.some(t => t.id === stmt.id)
+              ? { ...stmt, isVerified: true, status: 'MATCHED' }
+              : stmt
+          )
+        );
         
         setSelectedTransactions([]);
+        showSuccessAlert('Bulk Verification Complete!', `Successfully verified ${selectedBankTransactions.length} transactions.`);
         
+        // Refresh data
+        fetchData();
       } catch (error) {
-        showErrorAlert('Bulk Verification Failed', 'There was an error verifying multiple payments.');
+        showErrorAlert('Bulk Verification Failed', error.message || 'There was an error verifying multiple payments.');
       } finally {
         setIsLoading(false);
       }
@@ -1066,7 +1418,7 @@ const Transactions = () => {
 
   // Toggle select all
   const toggleSelectAll = () => {
-    const currentTransactions = filteredTransactions.filter(t => !t.verified);
+    const currentTransactions = filteredTransactions.filter(t => !t.isVerified);
     if (selectedTransactions.length === currentTransactions.length) {
       setSelectedTransactions([]);
     } else {
@@ -1074,25 +1426,81 @@ const Transactions = () => {
     }
   };
 
+  // Download receipt
+  const handleDownloadReceipt = async (transactionId) => {
+    try {
+      const response = await transactionApi.get(`/receipt/${transactionId}/pdf`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `receipt-${transactionId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      showSuccessAlert('Receipt Downloaded!', 'Receipt PDF has been downloaded successfully.');
+    } catch (error) {
+      showErrorAlert('Download Failed', error.message || 'Failed to download receipt.');
+    }
+  };
+
+  // Delete bank transaction
+  const handleDeleteTransaction = async (id) => {
+    const result = await showConfirmDialog(
+      'Delete Transaction',
+      'Are you sure you want to delete this bank transaction?',
+      'Delete',
+      'Cancel'
+    );
+
+    if (result.isConfirmed) {
+      try {
+        await transactionApi.delete(`/bank/${id}`);
+        setBankStatements(prev => prev.filter(stmt => stmt.id !== id));
+        showSuccessAlert('Transaction Deleted!', 'Bank transaction has been deleted successfully.');
+      } catch (error) {
+        showErrorAlert('Delete Failed', error.message || 'Failed to delete transaction.');
+      }
+    }
+  };
+
   // Statistics
   const stats = useMemo(() => {
-    const unverifiedCount = bankStatements.filter(stmt => !stmt.verified).length;
+    const unverifiedCount = bankStatements.filter(stmt => 
+      !stmt.isVerified && (stmt.status === 'UNVERIFIED' || stmt.status === 'PENDING')
+    ).length;
+
     const verifiedCount = verifiedTransactions.length;
-    const totalAmount = verifiedTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const totalAmount = verifiedTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+
     const todayAmount = verifiedTransactions.filter(t => {
-      const transactionDate = new Date(t.date);
+      const transactionDate = t.paymentDate ? new Date(t.paymentDate) : new Date();
       const today = new Date();
       return transactionDate.toDateString() === today.toDateString();
-    }).reduce((sum, t) => sum + t.amount, 0);
-    
+    }).reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    // Calculate total pending fees from all students
+    const totalPendingFees = students.reduce((sum, student) => 
+      sum + (student.pendingAmount || 0), 0);
+
+    // Count students with pending fees
+    const pendingPayments = students.filter(s => 
+      s.feeStatus === 'PENDING' && (s.pendingAmount || 0) > 0
+    ).length;
+
     return {
       unverifiedCount,
       verifiedCount,
-      totalAmount: `₹${(totalAmount / 1000000).toFixed(2)}M`,
-      todayAmount: `₹${(todayAmount / 1000).toFixed(1)}K`,
-      matchRate: `${bankStatements.length > 0 ? ((verifiedCount / bankStatements.length) * 100).toFixed(1) : '0'}%`
+      totalAmount: `₹${(totalAmount / 1_000_000).toFixed(2)}M`,
+      todayAmount: `₹${(todayAmount / 1_000).toFixed(1)}K`,
+      matchRate: `${bankStatements.length > 0 ? ((verifiedCount / bankStatements.length) * 100).toFixed(1) : '0'}%`,
+      pendingPayments,
+      totalPendingAmount: `₹${(totalPendingFees / 1_000).toFixed(1)}K`
     };
-  }, [bankStatements, verifiedTransactions]);
+  }, [bankStatements, verifiedTransactions, students]);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-blue-50/30 p-4 md:p-6">
@@ -1121,7 +1529,6 @@ const Transactions = () => {
               </div>
             </div>
           </div>
-          
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
               onClick={() => setShowImportModal(true)}
@@ -1131,12 +1538,12 @@ const Transactions = () => {
               Import Bank Statement
             </button>
             <button
-              onClick={() => setIsLoading(!isLoading)}
+              onClick={fetchData}
               disabled={isLoading}
               className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-3 rounded-xl border border-gray-200 shadow-sm disabled:opacity-50 transition-all"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Processing...' : 'Refresh'}
+              {isLoading ? 'Loading...' : 'Refresh Data'}
             </button>
           </div>
         </div>
@@ -1227,7 +1634,6 @@ const Transactions = () => {
                'Complete transaction history including bank statements'}
             </p>
           </div>
-          
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -1238,20 +1644,6 @@ const Transactions = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-            </div>
-            
-            <div className="flex gap-2">
-              <select
-                className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-              >
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="last7days">Last 7 Days</option>
-                <option value="thismonth">This Month</option>
-                <option value="all">All Time</option>
-              </select>
             </div>
           </div>
         </div>
@@ -1274,11 +1666,10 @@ const Transactions = () => {
                 <span className="text-sm text-blue-700">
                   Total amount: ₹{bankStatements
                     .filter(stmt => selectedTransactions.includes(stmt.id))
-                    .reduce((sum, stmt) => sum + stmt.amount, 0)
+                    .reduce((sum, stmt) => sum + (stmt.amount || 0), 0)
                     .toLocaleString()}
                 </span>
               </div>
-              
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleBulkVerify}
@@ -1308,7 +1699,7 @@ const Transactions = () => {
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
-                        checked={selectedTransactions.length === filteredTransactions.filter(t => !t.verified).length && filteredTransactions.filter(t => !t.verified).length > 0}
+                        checked={selectedTransactions.length === filteredTransactions.filter(t => !t.isVerified).length && filteredTransactions.filter(t => !t.isVerified).length > 0}
                         onChange={toggleSelectAll}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
@@ -1322,7 +1713,7 @@ const Transactions = () => {
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Amount & Method
                 </th>
-                <th className="px6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -1335,16 +1726,17 @@ const Transactions = () => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredTransactions.map((transaction) => {
-                const isBankTransaction = transaction.hasOwnProperty('bankAccount');
-                const student = isBankTransaction 
-                  ? students.find(s => s.id === transaction.matchedStudentId)
-                  : getStudentData(transaction.studentId);
-                
-                // Determine transaction status
-                const isVerified = transaction.verified || (!isBankTransaction);
-                const isMatched = isBankTransaction && transaction.status === 'matched' && transaction.verified;
-                const isUnverifiedBank = isBankTransaction && !transaction.verified;
-                
+                const isBankTransaction = transaction.hasOwnProperty('referenceNumber') ||
+                  transaction.hasOwnProperty('bankAccount') ||
+                  transaction.status === 'UNVERIFIED' ||
+                  transaction.status === 'PENDING';
+                const student = isBankTransaction
+                  ? transaction.student || getStudentData(transaction.student?.id)
+                  : transaction.student || getStudentData(transaction.studentId);
+                const isVerified = transaction.isVerified === true || (!isBankTransaction);
+                const isMatched = isBankTransaction && transaction.status === 'MATCHED';
+                const isUnverifiedBank = isBankTransaction && (!transaction.isVerified || transaction.isVerified === false);
+
                 return (
                   <motion.tr
                     key={transaction.id}
@@ -1359,7 +1751,7 @@ const Transactions = () => {
                           checked={selectedTransactions.includes(transaction.id)}
                           onChange={() => toggleTransactionSelection(transaction.id)}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          disabled={transaction.verified}
+                          disabled={transaction.isVerified}
                         />
                       </td>
                     )}
@@ -1372,15 +1764,16 @@ const Transactions = () => {
                             <Receipt className="w-4 h-4 text-gray-400" />
                           )}
                           <p className="font-semibold text-gray-900">
-                            {isBankTransaction ? transaction.description : transaction.receipt}
+                            {isBankTransaction ? (transaction.description || transaction.referenceNumber) : transaction.receiptNumber}
                           </p>
                         </div>
                         <div className="text-sm text-gray-600 mt-1">
-                          <p>Date: {transaction.date}</p>
+                          <p>Date: {transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleDateString() :
+                                   transaction.paymentDate ? new Date(transaction.paymentDate).toLocaleDateString() : 'N/A'}</p>
                           <p className="font-mono text-xs mt-1">
-                            Ref: {transaction.reference || transaction.bankReference}
+                            Ref: {transaction.referenceNumber || transaction.receiptNumber || 'N/A'}
                           </p>
-                          {isBankTransaction && (
+                          {isBankTransaction && transaction.bankAccount && (
                             <p className="text-xs text-gray-500">Acct: {transaction.bankAccount}</p>
                           )}
                         </div>
@@ -1388,12 +1781,12 @@ const Transactions = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
-                        <p className="text-lg font-bold text-gray-900">₹{transaction.amount.toLocaleString()}</p>
-                        <PaymentMethodBadge 
-                          method={isBankTransaction 
+                        <p className="text-lg font-bold text-gray-900">₹{transaction.amount?.toLocaleString() || '0'}</p>
+                        <PaymentMethodBadge
+                          method={isBankTransaction
                             ? getPaymentMethodFromBankTransaction(transaction.description)
-                            : transaction.method
-                          } 
+                            : transaction.paymentMethod
+                          }
                         />
                         {!isBankTransaction && transaction.smsSent && (
                           <div className="flex items-center gap-1 text-xs text-emerald-600">
@@ -1404,21 +1797,26 @@ const Transactions = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <TransactionStatusBadge 
-                        status={isBankTransaction ? transaction.status : 'verified'} 
+                      <TransactionStatusBadge
+                        status={isBankTransaction ? (transaction.status || 'unverified') : 'verified'}
                       />
                       {!isBankTransaction && transaction.verifiedBy && (
                         <p className="text-xs text-gray-500 mt-1">
-                          By {transaction.verifiedBy}
+                          By {transaction.verifiedBy?.fullName || transaction.verifiedBy}
                         </p>
                       )}
                     </td>
                     <td className="px-6 py-4">
                       {student ? (
                         <div>
-                          <p className="font-medium text-gray-900">{student.name}</p>
-                          <p className="text-sm text-gray-600">{student.class}</p>
-                          <p className="text-xs text-gray-500">{student.guardian}</p>
+                          <p className="font-medium text-gray-900">{student.fullName}</p>
+                          <p className="text-sm text-gray-600">{student.grade}</p>
+                          <p className="text-xs text-gray-500">{student.phone || student.contact || 'No phone'}</p>
+                          {student.feeStatus === 'PENDING' && student.pendingAmount > 0 && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Pending: ₹{student.pendingAmount.toLocaleString()}
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <div className="text-center">
@@ -1431,9 +1829,20 @@ const Transactions = () => {
                       <div className="flex items-center gap-2">
                         {/* Case 1: Verified transactions (non-bank) */}
                         {isVerified && !isBankTransaction ? (
-                          <VerifiedStatusIndicator isVerified={true} />
-                        ) : 
-                        /* Case 2: Matched bank transactions (still have action buttons) */
+                          <>
+                            <VerifiedStatusIndicator isVerified={true} />
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => handleDownloadReceipt(transaction.id)}
+                              className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                              title="Download Receipt"
+                            >
+                              <Download className="w-4 h-4" />
+                            </motion.button>
+                          </>
+                        ) :
+                        /* Case 2: Matched bank transactions */
                         isMatched ? (
                           <>
                             <motion.button
@@ -1448,14 +1857,14 @@ const Transactions = () => {
                             <motion.button
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
-                              onClick={() => handleEditPaymentRecord(transaction, false)}
+                              onClick={() => handleDownloadReceipt(transaction.id)}
                               className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                              title="View/Update Match"
+                              title="Download Receipt"
                             >
-                              <Link className="w-4 h-4" />
+                              <Download className="w-4 h-4" />
                             </motion.button>
                           </>
-                        ) : 
+                        ) :
                         /* Case 3: Unverified bank transactions */
                         isUnverifiedBank ? (
                           <>
@@ -1471,11 +1880,11 @@ const Transactions = () => {
                             <motion.button
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
-                              onClick={() => handleEditPaymentRecord(transaction, true)}
-                              className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                              title="Match to Student"
+                              onClick={() => handleDeleteTransaction(transaction.id)}
+                              className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors"
+                              title="Delete Transaction"
                             >
-                              <Link className="w-4 h-4" />
+                              <X className="w-4 h-4" />
                             </motion.button>
                           </>
                         ) : null}
@@ -1505,7 +1914,7 @@ const Transactions = () => {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No transactions found</h3>
               <p className="text-gray-500 max-w-md mx-auto mb-6">
-                {activeTab === 'unverified' 
+                {activeTab === 'unverified'
                   ? 'All bank transactions have been verified. Import new bank statements to see more.'
                   : 'No transactions match your current search criteria.'}
               </p>
@@ -1523,211 +1932,13 @@ const Transactions = () => {
         </div>
       </motion.div>
 
-      {/* Import Modal with Glasmorphic Background */}
-      {showImportModal && (
-        <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-          {/* Glassmorphism Backdrop */}
-          <div 
-            className="absolute inset-0 bg-linear-to-br from-blue-500/10 via-purple-500/5 to-pink-500/10 backdrop-blur-sm"
-            onClick={() => setShowImportModal(false)}
-          />
-          
-          {/* Glassmorphism Modal */}
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            className="relative bg-white/80 backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl w-full max-w-md overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.75) 100%)',
-              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-            }}
-          >
-            {/* Modal Header */}
-            <div className="p-6 border-b border-white/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-linear-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm rounded-xl">
-                    <Upload className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">Import Bank Statement</h3>
-                    <p className="text-sm text-gray-600 mt-1">Upload your bank statement file</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowImportModal(false)}
-                  className="p-2 hover:bg-white/50 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Upload Area */}
-              <motion.div
-                whileHover={{ scale: 1.02 }}
-                className="relative border-2 border-dashed border-blue-300/50 bg-linear-to-br from-blue-50/50 to-blue-100/30 backdrop-blur-sm rounded-2xl p-8 text-center"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.05) 100%)',
-                }}
-              >
-                <div className="absolute inset-0 bg-linear-to-br from-blue-500/5 to-purple-500/5 rounded-2xl" />
-                
-                <div className="relative">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-linear-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm rounded-2xl mb-4">
-                    <Upload className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 mb-2">
-                    Drop your bank statement here
-                  </p>
-                  <p className="text-xs text-gray-600 mb-4">
-                    Supports CSV, Excel, or PDF files
-                  </p>
-                  
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx,.xls,.pdf"
-                      onChange={(e) => setImportFile(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="inline-flex items-center gap-2 bg-linear-to-r from-blue-600 to-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg shadow-blue-500/25"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Choose File
-                    </motion.div>
-                  </div>
-                  
-                  {importFile && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-4 p-3 bg-white/80 backdrop-blur-sm rounded-xl border border-emerald-200"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-emerald-600" />
-                          <span className="text-sm font-medium text-gray-900 truncate max-w-50">
-                            {importFile.name}
-                          </span>
-                        </div>
-                        <span className="text-xs text-gray-500">
-                          {(importFile.size / 1024 / 1024).toFixed(2)} MB
-                        </span>
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-              
-              {/* Tips Section */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="p-4 bg-linear-to-br from-blue-50/60 to-blue-100/40 backdrop-blur-sm rounded-2xl border border-blue-200/50"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertCircle className="w-5 h-5 text-blue-600" />
-                  <h4 className="text-sm font-semibold text-blue-900">Import Tips</h4>
-                </div>
-                <ul className="space-y-2">
-                  {[
-                    "Ensure file contains date, amount, and description columns",
-                    "Remove header rows before uploading",
-                    "CSV files should be comma-separated",
-                    "Maximum file size: 10MB",
-                    "Supported formats: CSV, Excel (xlsx, xls), PDF"
-                  ].map((tip, index) => (
-                    <motion.li
-                      key={index}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.05 * index }}
-                      className="flex items-start gap-2"
-                    >
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5" />
-                      <span className="text-xs text-blue-800">{tip}</span>
-                    </motion.li>
-                  ))}
-                </ul>
-              </motion.div>
-              
-              {/* File Requirements */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-700">Required Columns</span>
-                  <span className="text-xs text-gray-500">Case insensitive</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {["Date", "Amount", "Description"].map((col) => (
-                    <div
-                      key={col}
-                      className="bg-white/60 backdrop-blur-sm py-1.5 px-2 rounded-lg text-center text-xs font-medium text-gray-700 border border-gray-200/50"
-                    >
-                      {col}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
-            {/* Modal Footer */}
-            <div className="p-6 border-t border-white/20 bg-linear-to-r from-transparent via-white/30 to-transparent">
-              <div className="flex gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowImportModal(false)}
-                  className="flex-1 px-4 py-3 bg-white/60 hover:bg-white/80 text-gray-700 rounded-xl border border-gray-300/50 backdrop-blur-sm transition-all text-sm font-medium"
-                >
-                  Cancel
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleUpload(importFile)}
-                  disabled={!importFile || isLoading}
-                  className="flex-1 px-4 py-3 bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium"
-                >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Importing...
-                    </span>
-                  ) : (
-                    'Import File'
-                  )}
-                </motion.button>
-              </div>
-              
-              {/* Processing Info */}
-              {isLoading && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 p-3 bg-linear-to-r from-blue-50/50 to-blue-100/30 backdrop-blur-sm rounded-xl border border-blue-200/50"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
-                      <span className="text-sm font-medium text-blue-900">Processing file...</span>
-                    </div>
-                    <span className="text-xs text-blue-700">
-                      This may take a moment
-                    </span>
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      )}
+      {/* Enhanced Import Modal with Glassmorphism */}
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onUpload={handleUpload}
+        isLoading={isLoading}
+      />
     </div>
   );
 };

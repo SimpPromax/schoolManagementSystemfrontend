@@ -13,9 +13,12 @@ import {
   School,
   X
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation();
+  const { user, logout } = useAuth();
+  
   const currentPath = location.pathname;
   
   let role = 'student';
@@ -48,17 +51,45 @@ const Sidebar = ({ isOpen, onClose }) => {
   const navItems = role === 'student' ? studentNav : role === 'teacher' ? teacherNav : accountantNav;
 
   const getUserInfo = () => {
+    if (!user) return { name: 'User', id: 'N/A' };
+    
     switch(role) {
-      case 'student': return { name: 'John Smith', id: 'STU20240025' };
-      case 'teacher': return { name: 'Ms. Priya Sharma', id: 'TCH2020008' };
-      case 'accountant': return { name: 'Mr. Rajesh Kumar', id: 'ACC2023005' };
-      default: return { name: 'User', id: 'N/A' };
+      case 'student': 
+        return { 
+          name: user.fullName || 'Student', 
+          id: user.id ? `STU${user.id.substring(0, 8).toUpperCase()}` : 'STU000000' 
+        };
+      case 'teacher': 
+        return { 
+          name: user.fullName || 'Teacher', 
+          id: user.id ? `TCH${user.id.substring(0, 8).toUpperCase()}` : 'TCH000000' 
+        };
+      case 'accountant': 
+        return { 
+          name: user.fullName || 'Accountant', 
+          id: user.id ? `ACC${user.id.substring(0, 8).toUpperCase()}` : 'ACC000000' 
+        };
+      default: 
+        return { 
+          name: user.fullName || user.username || 'User', 
+          id: user.id ? user.id.substring(0, 8).toUpperCase() : 'N/A' 
+        };
     }
   };
 
   const userInfo = getUserInfo();
 
   const handleLinkClick = () => {
+    if (window.innerWidth < 1024) onClose();
+  };
+
+  const handleLogout = async () => {
+    await logout(); // All confirmation + cleanup handled in AuthContext
+  };
+
+  const handleHomeClick = () => {
+    // Navigate to root (public home or login)
+    window.location.href = '/';
     if (window.innerWidth < 1024) onClose();
   };
 
@@ -103,26 +134,20 @@ const Sidebar = ({ isOpen, onClose }) => {
             <div className="bg-linear-to-r from-gray-50/70 to-gray-100/50 backdrop-blur-sm p-3 rounded-xl border border-white/30 shadow-sm">
               <p className="font-semibold text-sm text-gray-900">{userInfo.name}</p>
               <p className="text-xs text-gray-500/80 mt-1 font-mono">{userInfo.id}</p>
+              <p className="text-xs text-gray-500/60 mt-1">Role: {user?.role || role}</p>
             </div>
           </div>
 
           {/* Mobile Navigation */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
             {/* Home Button for Mobile */}
-            <NavLink
-              to="/"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 mb-2 ${
-                  isActive 
-                    ? 'bg-linear-to-r from-blue-100/80 to-blue-50/60 text-blue-700 backdrop-blur-sm shadow-sm' 
-                    : 'text-gray-700 hover:bg-gray-100/50 hover:shadow-sm'
-                }`
-              }
-              onClick={handleLinkClick}
+            <button
+              onClick={handleHomeClick}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 mb-2 w-full text-left text-gray-700 hover:bg-gray-100/50 hover:shadow-sm"
             >
               <Home className="w-5 h-5" />
               <span>Home</span>
-            </NavLink>
+            </button>
 
             {navItems.map((item) => (
               <NavLink
@@ -154,7 +179,10 @@ const Sidebar = ({ isOpen, onClose }) => {
               <Settings className="w-5 h-5" />
               <span>Settings</span>
             </NavLink>
-            <button className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50/50 w-full transition-colors">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50/50 w-full transition-colors"
+            >
               <LogOut className="w-5 h-5" />
               <span>Logout</span>
             </button>
@@ -178,24 +206,18 @@ const Sidebar = ({ isOpen, onClose }) => {
             </div>
 
             {/* Home Button - Always at top */}
-            <NavLink
-              to="/"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  isActive 
-                    ? 'bg-linear-to-r from-blue-100/80 to-blue-50/60 text-blue-700 backdrop-blur-sm shadow-sm' 
-                    : 'text-gray-700 hover:bg-gray-100/50 hover:shadow-sm'
-                }`
-              }
-              onClick={handleLinkClick}
+            <button
+              onClick={handleHomeClick}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 w-full text-left text-gray-700 hover:bg-gray-100/50 hover:shadow-sm"
             >
               <Home className="w-5 h-5" />
               <span>Home</span>
-            </NavLink>
+            </button>
 
             <div className="bg-linear-to-r from-gray-50/70 to-gray-100/50 backdrop-blur-sm p-4 rounded-xl border border-white/30 shadow-sm">
               <p className="font-semibold text-sm text-gray-900">{userInfo.name}</p>
               <p className="text-xs text-gray-500/80 mt-1 font-mono">{userInfo.id}</p>
+              <p className="text-xs text-gray-500/60 mt-1">Role: {user?.role || role}</p>
             </div>
           </div>
 
@@ -238,7 +260,10 @@ const Sidebar = ({ isOpen, onClose }) => {
               <span>Settings</span>
             </NavLink>
 
-            <button className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-red-600 hover:bg-linear-to-r from-red-50/60 to-red-100/40 backdrop-blur-sm hover:shadow-sm w-full transition-all duration-200 group">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-red-600 hover:bg-linear-to-r from-red-50/60 to-red-100/40 backdrop-blur-sm hover:shadow-sm w-full transition-all duration-200 group"
+            >
               <LogOut className="w-5 h-5 group-hover:rotate-90 transition-transform" />
               <span>Logout</span>
             </button>

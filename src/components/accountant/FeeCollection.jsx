@@ -1655,7 +1655,7 @@ School Accounts Department`}
       icon: ArrowRight,
       label: 'View Transactions',
       color: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
-      action: () => navigate('/accountant/fees/transactions')
+      action: () => navigate('/accountant/transactions')
     }
   ];
 
@@ -1956,7 +1956,7 @@ School Accounts Department`}
             <p className="text-sm text-gray-600 mt-1">Latest fee payments received</p>
           </div>
           <Link 
-            to="/accountant/fees/transactions"
+            to="/accountant/transactions"
             className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline flex items-center gap-1"
           >
             View All Transactions
@@ -1972,7 +1972,7 @@ School Accounts Department`}
               animate={{ opacity: 1, x: 0 }}
               whileHover={{ x: 5 }}
               className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 hover:border-blue-200 transition-all cursor-pointer"
-              onClick={() => navigate(`/accountant/fees/transactions`)}
+              onClick={() => navigate(`/accountant/transactions`)}
             >
               <div className="flex items-center gap-4">
                 <div className={`p-2 rounded-lg ${
@@ -2062,7 +2062,7 @@ School Accounts Department`}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
               {/* Expand Button */}
               <button
-                onClick={() => navigate('/accountant/fees/transactions')}
+                onClick={() => navigate('/accountant/transactions')}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm hover:shadow-md"
               >
                 <ArrowRight className="w-4 h-4" />
