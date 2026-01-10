@@ -177,7 +177,8 @@ const TransactionStatusBadge = ({ status }) => {
     unmatched: { label: 'Unmatched', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: Unlink },
     UNVERIFIED: { label: 'Unverified', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: AlertCircle },
     MATCHED: { label: 'Matched', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Link },
-    PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock }
+    PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock },
+    VERIFIED: { label: 'Verified', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle }
   };
 
   const { label, color, icon: Icon } = config[status] || config.unverified;
@@ -286,8 +287,6 @@ const handleError = (error) => {
   }
 };
 
-
-// Enhanced Import Modal Component with Glassmorphism
 // Enhanced Import Modal Component with Glassmorphism
 const ImportModal = ({ isOpen, onClose, onUpload, isLoading }) => {
   const [file, setFile] = useState(null);
@@ -670,14 +669,10 @@ const Transactions = () => {
   const { showAlert } = useAuth();
   
   const [isLoading, setIsLoading] = useState(false);
-  const [dateRange, setDateRange] = useState('today');
-  const [paymentMethod, setPaymentMethod] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransactions, setSelectedTransactions] = useState([]);
-  const [viewMode, setViewMode] = useState('list');
   const [activeTab, setActiveTab] = useState('unverified');
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importFile, setImportFile] = useState(null);
 
   // State for backend data
   const [bankStatements, setBankStatements] = useState([]);
@@ -691,90 +686,80 @@ const Transactions = () => {
   });
 
   // Fetch data from backend
-  const fetchData = useCallback(async () => {
+ const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch bank transactions
-      const bankResponse = await transactionApi.get('/bank', {
-        params: { page: 0, size: 100 }
-      });
-      const bankData = handleResponse(bankResponse);
-      setBankStatements(Array.isArray(bankData) ? bankData : (bankData.content || []));
+        // 1. Fetch bank transactions (with error handling)
+        let bankData = [];
+        try {
+            const bankResponse = await transactionApi.get('/bank', {
+                params: { page: 0, size: 100 }
+            });
+            bankData = handleResponse(bankResponse);
+        } catch (bankError) {
+            console.error('Error fetching bank transactions:', bankError);
+            showAlert('warning', 'Bank transactions', 'Could not load bank transactions');
+        }
 
-      // Fetch verified transactions
-      const verifiedResponse = await transactionApi.get('/verified', {
-        params: { page: 0, size: 100 }
-      });
-      const verifiedData = handleResponse(verifiedResponse);
-      setVerifiedTransactions(Array.isArray(verifiedData) ? verifiedData : (verifiedData.content || []));
+        // 2. Fetch verified transactions (with fallback)
+        let verifiedData = [];
+        try {
+            const verifiedResponse = await transactionApi.get('/verified', {
+                params: { page: 0, size: 100 }
+            });
+            verifiedData = handleResponse(verifiedResponse);
+        } catch (verifiedError) {
+            console.warn('Verified transactions endpoint error, using empty array:', verifiedError);
+            // Continue with empty array
+        }
 
-      // Fetch students from StudentDTO API (enhanced with fee info)
-      try {
-        const studentsResponse = await axios.get('http://localhost:8080/api/v1/students', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        const studentsData = studentsResponse.data;
-        
-        // The backend now returns List<StudentDTO> directly
-        const formattedStudents = (Array.isArray(studentsData) ? studentsData : []).map(dto => ({
-          id: dto.id,
-          studentId: dto.studentId,
-          fullName: dto.fullName,
-          grade: dto.grade,
-          phone: dto.phone,
-          email: dto.email,
-          address: dto.address,
-          emergencyContactName: dto.emergencyContactName,
-          emergencyContactPhone: dto.emergencyContactPhone,
-          emergencyRelation: dto.emergencyRelation,
+        // 3. Set state
+        setBankStatements(Array.isArray(bankData) ? bankData : (bankData.content || []));
+        setVerifiedTransactions(Array.isArray(verifiedData) ? verifiedData : (verifiedData.content || []));
 
-          // ✅ Use NEW fee fields from backend
-          totalFee: dto.totalFee || 0,
-          paidAmount: dto.paidAmount || 0,
-          pendingAmount: dto.pendingAmount !== undefined 
-            ? dto.pendingAmount 
-            : Math.max(0, (dto.totalFee || 0) - (dto.paidAmount || 0)),
-          feeStatus: dto.feeStatus || 'PENDING',
+        // 4. Fetch students
+        try {
+            const studentsResponse = await axios.get('http://localhost:8080/api/v1/students', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            const studentsData = studentsResponse.data;
+            
+            const formattedStudents = (Array.isArray(studentsData) ? studentsData : []).map(dto => ({
+                id: dto.id,
+                studentId: dto.studentId,
+                fullName: dto.fullName,
+                grade: dto.grade,
+                phone: dto.phone,
+                email: dto.email,
+                address: dto.address,
+                emergencyContactName: dto.emergencyContactName,
+                emergencyContactPhone: dto.emergencyContactPhone,
+                emergencyRelation: dto.emergencyRelation,
+                totalFee: dto.totalFee || 0,
+                paidAmount: dto.paidAmount || 0,
+                pendingAmount: dto.pendingAmount !== undefined 
+                    ? dto.pendingAmount 
+                    : Math.max(0, (dto.totalFee || 0) - (dto.paidAmount || 0)),
+                feeStatus: dto.feeStatus || 'PENDING',
+                contact: dto.phone || dto.emergencyContactPhone,
+            }));
 
-          // Fee breakdown
-          tuitionFee: dto.tuitionFee || 0,
-          admissionFee: dto.admissionFee || 0,
-          examinationFee: dto.examinationFee || 0,
-          otherFees: dto.otherFees || 0,
+            setStudents(formattedStudents);
+            console.log(`✅ Loaded ${formattedStudents.length} students`);
 
-          // Transport
-          transportMode: dto.transportMode,
-          transportFee: dto.transportFee || 0,
-          transportFeeStatus: dto.transportFeeStatus || 'PENDING',
-
-          // Compatibility alias
-          contact: dto.phone || dto.emergencyContactPhone,
-
-          // Related data (if fetched via JOIN)
-          familyMembers: dto.familyMembers || [],
-          medicalRecords: dto.medicalRecords || [],
-          achievements: dto.achievements || [],
-          clubs: dto.clubs || [],
-          hobbies: dto.hobbies || []
-        }));
-
-        setStudents(formattedStudents);
-        console.log(`✅ Loaded ${formattedStudents.length} students with real fee data`);
-
-      } catch (studentError) {
-        console.error('Error fetching students from /api/v1/students:', studentError);
-        // REMOVED MOCK DATA - Only use real backend data
-        showErrorAlert('Student Data Error', 'Failed to load student data from server');
-      }
+        } catch (studentError) {
+            console.error('Error fetching students:', studentError);
+            showAlert('warning', 'Student Data', 'Could not load student information');
+        }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      showAlert('error', 'Failed to load data', error.message);
+        console.error('General error fetching data:', error);
+        showAlert('error', 'Data Load Error', error.message);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  }, [showAlert]);
+}, [showAlert]);
 
   useEffect(() => {
     fetchData();
@@ -790,6 +775,11 @@ const Transactions = () => {
       transactions = bankStatements.filter(stmt =>
         (!stmt.isVerified || stmt.isVerified === false) &&
         (stmt.status === 'UNVERIFIED' || stmt.status === 'PENDING')
+      );
+    } else if (activeTab === 'matched') {
+      // Show MATCHED transactions (auto-verified by backend)
+      transactions = bankStatements.filter(stmt =>
+        stmt.status === 'MATCHED'
       );
     } else {
       transactions = [...verifiedTransactions, ...bankStatements];
@@ -839,7 +829,6 @@ const Transactions = () => {
       const importedData = handleResponse(response);
       setBankStatements(prev => [...importedData, ...prev]);
       setShowImportModal(false);
-      setImportFile(null);
       
       showSuccessAlert(
         'File Imported!',
@@ -1470,40 +1459,43 @@ const Transactions = () => {
   // Statistics
   const stats = useMemo(() => {
     const unverifiedCount = bankStatements.filter(stmt => 
-      !stmt.isVerified && (stmt.status === 'UNVERIFIED' || stmt.status === 'PENDING')
+        !stmt.isVerified && (stmt.status === 'UNVERIFIED' || stmt.status === 'PENDING')
+    ).length;
+
+    const matchedCount = bankStatements.filter(stmt => 
+        stmt.status === 'MATCHED'
     ).length;
 
     const verifiedCount = verifiedTransactions.length;
     const totalAmount = verifiedTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
 
     const todayAmount = verifiedTransactions.filter(t => {
-      const transactionDate = t.paymentDate ? new Date(t.paymentDate) : new Date();
-      const today = new Date();
-      return transactionDate.toDateString() === today.toDateString();
+        const transactionDate = t.paymentDate ? new Date(t.paymentDate) : new Date();
+        const today = new Date();
+        return transactionDate.toDateString() === today.toDateString();
     }).reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const totalBankTransactions = bankStatements.length;
+    const matchRate = totalBankTransactions > 0 ? 
+        ((matchedCount / totalBankTransactions) * 100).toFixed(1) + '%' : '0%';
 
     // Calculate total pending fees from all students
     const totalPendingFees = students.reduce((sum, student) => 
-      sum + (student.pendingAmount || 0), 0);
-
-    // Count students with pending fees
-    const pendingPayments = students.filter(s => 
-      s.feeStatus === 'PENDING' && (s.pendingAmount || 0) > 0
-    ).length;
+        sum + (student.pendingAmount || 0), 0);
 
     return {
-      unverifiedCount,
-      verifiedCount,
-      totalAmount: `₹${(totalAmount / 1_000_000).toFixed(2)}M`,
-      todayAmount: `₹${(todayAmount / 1_000).toFixed(1)}K`,
-      matchRate: `${bankStatements.length > 0 ? ((verifiedCount / bankStatements.length) * 100).toFixed(1) : '0'}%`,
-      pendingPayments,
-      totalPendingAmount: `₹${(totalPendingFees / 1_000).toFixed(1)}K`
+        unverifiedCount,
+        matchedCount,
+        verifiedCount,
+        totalAmount: `₹${(totalAmount / 1_000_000).toFixed(2)}M`,
+        todayAmount: `₹${(todayAmount / 1_000).toFixed(1)}K`,
+        matchRate,
+        totalPendingAmount: `₹${(totalPendingFees / 1_000).toFixed(1)}K`
     };
   }, [bankStatements, verifiedTransactions, students]);
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-blue-50/30 p-4 md:p-6">
+    <div className="min-h-[90vh] bg-linear-to-br from-gray-50 via-white to-blue-50/30 p-4 md:p-6">
       {/* Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -1549,7 +1541,7 @@ const Transactions = () => {
         </div>
       </motion.header>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - UPDATED with your requested layout */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1557,44 +1549,45 @@ const Transactions = () => {
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8"
       >
         <StatCard
-          label="Unverified Transactions"
-          value={stats.unverifiedCount}
+          label="Unmatched Transactions"
+          value={stats.unverifiedCount || 0}
           icon={AlertCircle}
           color="bg-gradient-to-br from-amber-500 to-amber-600"
           trend="Needs Attention"
           change={0}
         />
         <StatCard
-          label="Verified Payments"
-          value={stats.verifiedCount}
+          label="Matched Transactions"
+          value={stats.matchedCount || 0}
           icon={CheckCircle}
           color="bg-gradient-to-br from-emerald-500 to-emerald-600"
-          trend="+12.5%"
-          change={12.5}
-        />
-        <StatCard
-          label="Total Verified Amount"
-          value={stats.totalAmount}
-          icon={DollarSign}
-          color="bg-gradient-to-br from-blue-500 to-blue-600"
-          trend="+8.5%"
-          change={8.5}
+          trend="Auto-matched"
+          change={0}
         />
         <StatCard
           label="Match Rate"
-          value={stats.matchRate}
+          value={stats.matchRate || "0%"}
           icon={Percent}
           color="bg-gradient-to-br from-purple-500 to-purple-600"
-          trend="Improving"
-          change={5.2}
+          trend="Success Rate"
+          change={0}
+        />
+        <StatCard
+          label="Verified Payments"
+          value={stats.verifiedCount || 0}
+          icon={DollarSign}
+          color="bg-gradient-to-br from-blue-500 to-blue-600"
+          trend="Completed"
+          change={0}
         />
       </motion.div>
 
-      {/* Tabs */}
+      {/* Tabs - UPDATED with correct labels */}
       <div className="mb-6">
         <div className="flex border-b border-gray-200">
           {[
-            { id: 'unverified', label: 'Unverified Bank Transactions', icon: AlertCircle },
+            { id: 'unverified', label: 'Unmatched Transactions', icon: Unlink },
+            { id: 'matched', label: 'Matched Transactions', icon: Link },
             { id: 'verified', label: 'Verified Payments', icon: CheckCircle },
             { id: 'all', label: 'All Transactions', icon: Database }
           ].map(tab => (
@@ -1625,13 +1618,15 @@ const Transactions = () => {
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
-              {activeTab === 'unverified' ? 'Unverified Bank Transactions' :
+              {activeTab === 'unverified' ? 'Unmatched Transactions' :
+               activeTab === 'matched' ? 'Matched Transactions (Auto-verified)' :
                activeTab === 'verified' ? 'Verified Payments' : 'All Transactions'}
             </h2>
             <p className="text-sm text-gray-600 mt-1">
-              {activeTab === 'unverified' ? 'Match bank transactions to students and verify payments' :
-               activeTab === 'verified' ? 'View all verified payments and student records' :
-               'Complete transaction history including bank statements'}
+              {activeTab === 'unverified' ? 'Bank transactions that need manual matching to students' :
+               activeTab === 'matched' ? 'Auto-verified transactions matched by the system' :
+               activeTab === 'verified' ? 'Manually verified payments with student records' :
+               'Complete transaction history'}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
@@ -1735,7 +1730,7 @@ const Transactions = () => {
                   : transaction.student || getStudentData(transaction.studentId);
                 const isVerified = transaction.isVerified === true || (!isBankTransaction);
                 const isMatched = isBankTransaction && transaction.status === 'MATCHED';
-                const isUnverifiedBank = isBankTransaction && (!transaction.isVerified || transaction.isVerified === false);
+                const isUnverified = isBankTransaction && (!transaction.isVerified || transaction.isVerified === false);
 
                 return (
                   <motion.tr
@@ -1756,26 +1751,61 @@ const Transactions = () => {
                       </td>
                     )}
                     <td className="px-6 py-4">
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="space-y-1">
+                        <div className="flex items-start gap-2">
                           {isBankTransaction ? (
-                            <Banknote className="w-4 h-4 text-gray-400" />
+                            <Banknote className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
                           ) : (
-                            <Receipt className="w-4 h-4 text-gray-400" />
+                            <Receipt className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                           )}
-                          <p className="font-semibold text-gray-900">
-                            {isBankTransaction ? (transaction.description || transaction.referenceNumber) : transaction.receiptNumber}
-                          </p>
-                        </div>
-                        <div className="text-sm text-gray-600 mt-1">
-                          <p>Date: {transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleDateString() :
-                                   transaction.paymentDate ? new Date(transaction.paymentDate).toLocaleDateString() : 'N/A'}</p>
-                          <p className="font-mono text-xs mt-1">
-                            Ref: {transaction.referenceNumber || transaction.receiptNumber || 'N/A'}
-                          </p>
-                          {isBankTransaction && transaction.bankAccount && (
-                            <p className="text-xs text-gray-500">Acct: {transaction.bankAccount}</p>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900">
+                              {transaction.description || 
+                               (isBankTransaction ? 'Bank Transaction' : 'Verified Payment')}
+                            </p>
+                            <div className="mt-1 space-y-0.5">
+                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                                <Calendar className="w-3 h-3" />
+                                <span>
+                                  {transaction.transactionDate 
+                                    ? new Date(transaction.transactionDate).toLocaleDateString('en-IN', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })
+                                    : transaction.paymentDate
+                                    ? new Date(transaction.paymentDate).toLocaleDateString('en-IN', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })
+                                    : 'Date N/A'
+                                  }
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <FileText className="w-3 h-3 text-gray-500" />
+                                <code className="text-xs font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  {transaction.referenceNumber || transaction.receiptNumber || 'No Ref'}
+                                </code>
+                              </div>
+                              {/* Show student name if available */}
+                              {student && (
+                                <div className="flex items-center gap-2 text-xs text-blue-600">
+                                  <User className="w-3 h-3" />
+                                  <span className="font-medium">{student.fullName}</span>
+                                  {student.grade && <span className="text-gray-500">({student.grade})</span>}
+                                </div>
+                              )}
+                              {/* Show payment purpose if available */}
+                              {transaction.purpose && (
+                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                  <FileCheck className="w-3 h-3" />
+                                  <span>{transaction.purpose}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -1827,7 +1857,7 @@ const Transactions = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {/* Case 1: Verified transactions (non-bank) */}
+                        {/* Case 1: Verified payments (non-bank or VERIFIED status) */}
                         {isVerified && !isBankTransaction ? (
                           <>
                             <VerifiedStatusIndicator isVerified={true} />
@@ -1842,7 +1872,7 @@ const Transactions = () => {
                             </motion.button>
                           </>
                         ) :
-                        /* Case 2: Matched bank transactions */
+                        /* Case 2: Matched bank transactions (auto-verified) */
                         isMatched ? (
                           <>
                             <motion.button
@@ -1866,7 +1896,7 @@ const Transactions = () => {
                           </>
                         ) :
                         /* Case 3: Unverified bank transactions */
-                        isUnverifiedBank ? (
+                        isUnverified ? (
                           <>
                             <motion.button
                               whileHover={{ scale: 1.05 }}
@@ -1915,7 +1945,11 @@ const Transactions = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No transactions found</h3>
               <p className="text-gray-500 max-w-md mx-auto mb-6">
                 {activeTab === 'unverified'
-                  ? 'All bank transactions have been verified. Import new bank statements to see more.'
+                  ? 'All bank transactions have been processed. Import new bank statements to see more.'
+                  : activeTab === 'matched'
+                  ? 'No auto-matched transactions found.'
+                  : activeTab === 'verified'
+                  ? 'No verified payments found.'
                   : 'No transactions match your current search criteria.'}
               </p>
               {activeTab === 'unverified' && (
