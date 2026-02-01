@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable no-unused-vars */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Search,
   Filter,
@@ -61,19 +61,98 @@ import {
   History,
   Layers,
   Receipt as ReceiptIcon,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
+  Info,
+  AlertOctagon,
+  ShieldCheck,
+  BarChart
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+  Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   AreaChart, Area, ScatterChart, Scatter, ZAxis
 } from 'recharts';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import axios from 'axios';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
+
+// Create axios instance with the same pattern as Transactions
+const feeApi = axios.create({
+  baseURL: 'http://localhost:8080/api/fee-collection',
+  timeout: 10000,
+});
+
+// Add request interceptor for auth token
+feeApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response handler - consistent with Transactions component
+const handleResponse = (response) => {
+  const responseData = response.data;
+  if (responseData && typeof responseData === 'object') {
+    if (responseData.success === false) {
+      throw new Error(responseData.message || 'Request failed');
+    }
+    return responseData.data || responseData;
+  }
+  return responseData;
+};
+
+// Error handler - consistent with Transactions component
+const handleError = (error) => {
+  console.error('Error details:', error);
+  
+  if (error.response) {
+    const errorData = error.response.data;
+    console.log('Backend error response:', errorData);
+    
+    let errorMessage = 'Request failed';
+    
+    if (typeof errorData === 'string') {
+      errorMessage = errorData;
+    } else if (errorData && typeof errorData === 'object') {
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.exception) {
+        errorMessage = errorData.exception;
+      } else if (errorData.timestamp) {
+        errorMessage = errorData.message || errorData.error || 'Server error occurred';
+      }
+    }
+    
+    console.error('Backend error details:', {
+      status: error.response.status,
+      statusText: error.response.statusText,
+      data: errorData,
+      headers: error.response.headers
+    });
+    
+    throw new Error(errorMessage);
+  } else if (error.request) {
+    throw new Error('No response from server. Please check your connection.');
+  } else {
+    throw new Error(error.message || 'Request failed');
+  }
+};
 
 // SweetAlert2 configuration
 const showSuccessAlert = (title, message) => {
@@ -144,16 +223,104 @@ const showConfirmDialog = (title, message, confirmText, cancelText) => {
   });
 };
 
+// Loading Spinner Component
+const LoadingSpinner = ({ size = 'md', text = 'Loading...' }) => {
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-6 h-6',
+    lg: 'w-8 h-8',
+    xl: 'w-12 h-12'
+  };
+  
+  return (
+    <div className="flex flex-col items-center justify-center p-4">
+      <Loader2 className={`${sizeClasses[size]} animate-spin text-blue-600 mb-2`} />
+      <span className="text-sm text-gray-600">{text}</span>
+    </div>
+  );
+};
+
+// Loading Overlay Component
+const LoadingOverlay = ({ isLoading, message = 'Loading...' }) => {
+  if (!isLoading) return null;
+  
+  return (
+    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
+      <div className="text-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+        <p className="text-sm text-gray-700">{message}</p>
+      </div>
+    </div>
+  );
+};
+
+// Payment Transaction Card Component
+const PaymentTransactionCard = ({ payment, student }) => (
+  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors group">
+    <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center gap-2">
+        <Calendar className="w-3 h-3 text-gray-500" />
+        <span className="text-sm font-medium text-gray-900">
+          {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}
+        </span>
+      </div>
+      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-mono">
+        {payment.receiptNumber}
+      </span>
+    </div>
+    
+    <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center gap-2">
+        <PaymentMethodBadge method={payment.paymentMethod} />
+        {payment.installmentNumber && (
+          <span className="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+            Installment {payment.installmentNumber}
+          </span>
+        )}
+      </div>
+      <span className="text-lg font-bold text-emerald-600">
+        ₹{payment.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+      </span>
+    </div>
+    
+    {payment.notes && (
+      <div className="mt-2 pt-2 border-t border-gray-200">
+        <p className="text-xs text-gray-600 flex items-start gap-1">
+          <span className="mt-0.5">📝</span>
+          <span>{payment.notes}</span>
+        </p>
+      </div>
+    )}
+    
+    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
+      <div className="text-xs text-gray-500">
+        <span className="font-medium">Verified by:</span> {payment.verifiedBy || 'System'}
+      </div>
+      {payment.verified && (
+        <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded flex items-center gap-1">
+          <ShieldCheck className="w-3 h-3" /> Verified
+        </span>
+      )}
+    </div>
+  </div>
+);
+
 // Custom components
 const FeeStatusBadge = ({ status }) => {
   const config = {
-    paid: { label: 'Paid', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle },
-    pending: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock },
-    overdue: { label: 'Overdue', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: AlertTriangle },
+    PAID: { label: 'Paid', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle },
+    PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock },
+    OVERDUE: { label: 'Overdue', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: AlertTriangle },
     partial: { label: 'Partial', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Percent }
   };
 
-  const { label, color, icon: Icon } = config[status] || config.pending;
+  const { label, color, icon: Icon } = config[status] || config.PENDING;
 
   return (
     <motion.span
@@ -169,15 +336,19 @@ const FeeStatusBadge = ({ status }) => {
 
 const PaymentMethodBadge = ({ method }) => {
   const config = {
-    online: { label: 'Online', color: 'bg-blue-100 text-blue-800', icon: CreditCard },
-    card: { label: 'Card', color: 'bg-emerald-100 text-emerald-800', icon: Card },
-    upi: { label: 'UPI', color: 'bg-purple-100 text-purple-800', icon: QrCode },
-    cash: { label: 'Cash', color: 'bg-amber-100 text-amber-800', icon: Banknote },
-    cheque: { label: 'Cheque', color: 'bg-gray-100 text-gray-800', icon: FileText },
-    bank: { label: 'Bank Transfer', color: 'bg-indigo-100 text-indigo-800', icon: FileSpreadsheet }
+    ONLINE_BANKING: { label: 'Online', color: 'bg-blue-100 text-blue-800', icon: CreditCard },
+    CREDIT_CARD: { label: 'Credit Card', color: 'bg-emerald-100 text-emerald-800', icon: Card },
+    DEBIT_CARD: { label: 'Debit Card', color: 'bg-emerald-100 text-emerald-800', icon: Card },
+    UPI: { label: 'UPI', color: 'bg-purple-100 text-purple-800', icon: QrCode },
+    CASH: { label: 'Cash', color: 'bg-amber-100 text-amber-800', icon: Banknote },
+    CHEQUE: { label: 'Cheque', color: 'bg-gray-100 text-gray-800', icon: FileText },
+    BANK_TRANSFER: { label: 'Bank Transfer', color: 'bg-indigo-100 text-indigo-800', icon: FileSpreadsheet },
+    NEFT: { label: 'NEFT', color: 'bg-indigo-100 text-indigo-800', icon: FileSpreadsheet },
+    RTGS: { label: 'RTGS', color: 'bg-indigo-100 text-indigo-800', icon: FileSpreadsheet },
+    IMPS: { label: 'IMPS', color: 'bg-indigo-100 text-indigo-800', icon: FileSpreadsheet }
   };
   
-  const { label, color, icon: Icon } = config[method] || config.online;
+  const { label, color, icon: Icon } = config[method] || { label: method, color: 'bg-gray-100 text-gray-800', icon: CreditCard };
   
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${color}`}>
@@ -187,7 +358,7 @@ const PaymentMethodBadge = ({ method }) => {
   );
 };
 
-const StatCard = ({ label, value, icon: Icon, color, trend, change }) => {
+const StatCard = ({ label, value, icon: Icon, color, trend, change, isLoading = false }) => {
   const trendColor = change >= 0 ? 'text-emerald-600' : 'text-rose-600';
   const trendIcon = change >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />;
   
@@ -195,13 +366,20 @@ const StatCard = ({ label, value, icon: Icon, color, trend, change }) => {
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+      className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative"
     >
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-xl">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-          {trend && (
+          <p className="text-2xl font-bold text-gray-900 mt-1">
+            {isLoading ? '...' : value}
+          </p>
+          {trend && !isLoading && (
             <div className="flex items-center gap-1 mt-2">
               <span className={`text-xs font-medium ${trendColor} flex items-center gap-1`}>
                 {trendIcon}
@@ -256,10 +434,46 @@ const NotificationToast = ({ type, message, onAction }) => {
   );
 };
 
+// Helper function to calculate payment percentage
+const calculatePaymentPercentage = (totalFee, paidAmount) => {
+  if (!totalFee || totalFee <= 0) return 0;
+  if (!paidAmount) return 0;
+  const percentage = (paidAmount / totalFee) * 100;
+  return Math.min(100, Math.max(0, percentage));
+};
+
+// Report Type and Format enums matching backend
+const ReportType = {
+  STUDENT_FEE_SUMMARY: 'STUDENT_FEE_SUMMARY',
+  COLLECTION_TREND: 'COLLECTION_TREND',
+  PAYMENT_METHOD_ANALYSIS: 'PAYMENT_METHOD_ANALYSIS',
+  OVERDUE_ANALYSIS: 'OVERDUE_ANALYSIS',
+  CLASS_WISE_PERFORMANCE: 'CLASS_WISE_PERFORMANCE',
+  CUSTOM_REPORT: 'CUSTOM_REPORT'
+};
+
+const ReportFormat = {
+  PDF: 'PDF',
+  EXCEL: 'EXCEL',
+  CSV: 'CSV',
+  HTML: 'HTML'
+};
+
+// Map frontend report names to backend enum values
+const reportTypeMapping = {
+  'Monthly Collection Summary': ReportType.COLLECTION_TREND,
+  'Student Detailed Report': ReportType.STUDENT_FEE_SUMMARY,
+  'Overdue Analysis Report': ReportType.OVERDUE_ANALYSIS,
+  'Payment Methods Report': ReportType.PAYMENT_METHOD_ANALYSIS,
+  'Class-wise Performance': ReportType.CLASS_WISE_PERFORMANCE
+};
+
 const FeeCollection = () => {
   const navigate = useNavigate();
+  const { showAlert } = useAuth();
+  
   const [selectedClass, setSelectedClass] = useState('All');
-  const [selectedTerm, setSelectedTerm] = useState('Q1 2025');
+  const [selectedTerm, setSelectedTerm] = useState('MONTHLY');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -270,389 +484,229 @@ const FeeCollection = () => {
   const [dateRange, setDateRange] = useState('this_month');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // Enhanced student data with payment history
-  const [students, setStudents] = useState([
-    { 
-      id: 1, 
-      name: 'Rohan Kumar', 
-      class: 'Grade 10A', 
-      guardian: 'Mr. Kumar', 
-      contact: '9876543210', 
-      email: 'rohan@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 0,
-      pending: 45000,
-      status: 'pending',
-      lastPayment: null,
-      paymentHistory: [],
-      remindersSent: 0,
-      lastReminder: null
-    },
-    { 
-      id: 2, 
-      name: 'Anjali Singh', 
-      class: 'Grade 10A', 
-      guardian: 'Mrs. Singh', 
-      contact: '9876543211', 
-      email: 'anjali@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 0,
-      pending: 45000,
-      status: 'pending',
-      lastPayment: null,
-      paymentHistory: [],
-      remindersSent: 0,
-      lastReminder: null
-    },
-    { 
-      id: 3, 
-      name: 'Vikram Patel', 
-      class: 'Grade 10B', 
-      guardian: 'Mr. Patel', 
-      contact: '9876543212', 
-      email: 'vikram@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-10',
-      paid: 0,
-      pending: 45000,
-      status: 'pending',
-      lastPayment: null,
-      paymentHistory: [],
-      remindersSent: 0,
-      lastReminder: null
-    },
-    { 
-      id: 4, 
-      name: 'Priya Sharma', 
-      class: 'Grade 11A', 
-      guardian: 'Mrs. Sharma', 
-      contact: '9876543213', 
-      email: 'priya@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 0,
-      pending: 45000,
-      status: 'pending',
-      lastPayment: null,
-      paymentHistory: [],
-      remindersSent: 0,
-      lastReminder: null
-    },
-    { 
-      id: 5, 
-      name: 'Arjun Mehta', 
-      class: 'Grade 11B', 
-      guardian: 'Mr. Mehta', 
-      contact: '9876543214', 
-      email: 'arjun@email.com', 
-      totalFee: 45000, 
-      dueDate: '2025-03-20',
-      paid: 0,
-      pending: 45000,
-      status: 'pending',
-      lastPayment: null,
-      paymentHistory: [],
-      remindersSent: 0,
-      lastReminder: null
-    },
-  ]);
+  // State for API data with loading states
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [collectionTrend, setCollectionTrend] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [overdueDistribution, setOverdueDistribution] = useState([]);
+  const [recentPayments, setRecentPayments] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [classAnalytics, setClassAnalytics] = useState([]);
+  
+  // Individual loading states
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [trendLoading, setTrendLoading] = useState(true);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+  const [overdueLoading, setOverdueLoading] = useState(true);
+  const [recentPaymentsLoading, setRecentPaymentsLoading] = useState(true);
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [classAnalyticsLoading, setClassAnalyticsLoading] = useState(true);
 
-  // Enhanced transactions data with complete payment history
-  const [transactions, setTransactions] = useState([
-    {
-      id: 1,
-      studentId: 1,
-      studentName: 'Rohan Kumar',
-      class: 'Grade 10A',
-      amount: 15000,
-      method: 'online',
-      date: '2025-03-15 14:30',
-      receipt: 'RC-001',
-      status: 'success',
-      verified: true,
-      verifiedBy: 'Admin',
-      transactionId: 'TXN_001',
-      notes: 'First installment - 1 of 3',
-      installmentNumber: 1,
-      feeBreakdown: [
-        { category: 'Tuition', amount: 10000 },
-        { category: 'Transport', amount: 3000 },
-        { category: 'Activities', amount: 2000 }
-      ]
-    },
-    {
-      id: 2,
-      studentId: 1,
-      studentName: 'Rohan Kumar',
-      class: 'Grade 10A',
-      amount: 15000,
-      method: 'upi',
-      date: '2025-03-18 10:15',
-      receipt: 'RC-002',
-      status: 'success',
-      verified: true,
-      verifiedBy: 'System',
-      transactionId: 'TXN_002',
-      notes: 'Second installment - 2 of 3',
-      installmentNumber: 2
-    },
-    {
-      id: 3,
-      studentId: 2,
-      studentName: 'Anjali Singh',
-      class: 'Grade 10A',
-      amount: 22500,
-      method: 'card',
-      date: '2025-03-20 12:45',
-      receipt: 'RC-003',
-      status: 'success',
-      verified: true,
-      verifiedBy: 'Admin',
-      transactionId: 'TXN_003',
-      notes: 'Partial payment - 1st installment',
-      installmentNumber: 1,
-      feeBreakdown: [
-        { category: 'Tuition', amount: 15000 },
-        { category: 'Transport', amount: 4000 },
-        { category: 'Activities', amount: 2000 },
-        { category: 'Lab', amount: 1500 }
-      ]
-    },
-    {
-      id: 4,
-      studentId: 4,
-      studentName: 'Priya Sharma',
-      class: 'Grade 11A',
-      amount: 45000,
-      method: 'upi',
-      date: '2025-03-20 10:30',
-      receipt: 'RC-004',
-      status: 'success',
-      verified: true,
-      verifiedBy: 'System',
-      transactionId: 'TXN_004',
-      notes: 'Full payment via UPI'
-    },
-    {
-      id: 5,
-      studentId: 1,
-      studentName: 'Rohan Kumar',
-      class: 'Grade 10A',
-      amount: 15000,
-      method: 'cash',
-      date: '2025-03-22 16:20',
-      receipt: 'RC-005',
-      status: 'success',
-      verified: true,
-      verifiedBy: 'Admin',
-      transactionId: 'TXN_005',
-      notes: 'Final installment - 3 of 3 - Full payment completed',
-      installmentNumber: 3
-    }
-  ]);
+  // Cache for student recent payments
+  const [studentRecentPaymentsCache, setStudentRecentPaymentsCache] = useState({});
+  const [loadingStudentPayments, setLoadingStudentPayments] = useState({});
 
-  // Calculate student data from transactions whenever transactions change
+  // Load initial data
   useEffect(() => {
-    const calculateStudentData = () => {
-      const updatedStudents = students.map(student => {
-        // Get all transactions for this student
-        const studentTransactions = transactions.filter(t => t.studentId === student.id);
-        
-        if (studentTransactions.length === 0) {
-          return {
-            ...student,
-            paid: 0,
-            pending: student.totalFee,
-            status: 'pending',
-            lastPayment: null,
-            paymentHistory: []
-          };
-        }
+    loadInitialData();
+  }, []);
 
-        // Calculate total paid amount
-        const totalPaid = studentTransactions.reduce((sum, t) => sum + t.amount, 0);
-        
-        // Calculate pending amount
-        const pending = Math.max(0, student.totalFee - totalPaid);
-        
-        // Determine status
-        let status = 'pending';
-        if (pending <= 0) {
-          status = 'paid';
-        } else if (totalPaid > 0) {
-          status = 'partial';
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([
+        loadDashboardStats(),
+        loadCollectionTrend('MONTHLY'),
+        loadPaymentMethods(),
+        loadOverdueDistribution(),
+        loadRecentPayments(5),
+        loadStudents(),
+        loadClassAnalytics()
+      ]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showErrorAlert('Data Load Failed', 'Failed to load fee collection data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadDashboardStats = async () => {
+    setStatsLoading(true);
+    try {
+      const response = await feeApi.get('/dashboard/stats');
+      const statsData = handleResponse(response);
+      setDashboardStats(statsData);
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+      handleError(error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const loadCollectionTrend = async (period) => {
+    setTrendLoading(true);
+    try {
+      const response = await feeApi.get(`/dashboard/trend?period=${period}`);
+      const trendData = handleResponse(response);
+      setCollectionTrend(trendData.dataPoints || []);
+    } catch (error) {
+      console.error('Error loading collection trend:', error);
+      handleError(error);
+    } finally {
+      setTrendLoading(false);
+    }
+  };
+
+  const loadPaymentMethods = async () => {
+    setPaymentMethodsLoading(true);
+    try {
+      const response = await feeApi.get('/dashboard/payment-methods');
+      const paymentData = handleResponse(response);
+      setPaymentMethods(paymentData.paymentMethods || []);
+    } catch (error) {
+      console.error('Error loading payment methods:', error);
+      handleError(error);
+    } finally {
+      setPaymentMethodsLoading(false);
+    }
+  };
+
+  const loadOverdueDistribution = async () => {
+    setOverdueLoading(true);
+    try {
+      const response = await feeApi.get('/dashboard/overdue-distribution');
+      const overdueData = handleResponse(response);
+      setOverdueDistribution(overdueData.overdueRanges || []);
+    } catch (error) {
+      console.error('Error loading overdue distribution:', error);
+      handleError(error);
+    } finally {
+      setOverdueLoading(false);
+    }
+  };
+
+  const loadRecentPayments = async (limit) => {
+    setRecentPaymentsLoading(true);
+    try {
+      const response = await feeApi.get(`/dashboard/recent-payments?limit=${limit}`);
+      const paymentsData = handleResponse(response);
+      setRecentPayments(paymentsData || []);
+    } catch (error) {
+      console.error('Error loading recent payments:', error);
+      handleError(error);
+    } finally {
+      setRecentPaymentsLoading(false);
+    }
+  };
+
+  const loadStudents = async () => {
+    setStudentsLoading(true);
+    try {
+      const filterRequest = {
+        page: 0,
+        size: 50,
+        sortBy: 'createdAt',
+        sortDirection: 'DESC'
+      };
+      const response = await feeApi.post('/students/filter', filterRequest);
+      const studentsData = handleResponse(response);
+      setStudents(studentsData || []);
+    } catch (error) {
+      console.error('Error loading students:', error);
+      handleError(error);
+    } finally {
+      setStudentsLoading(false);
+    }
+  };
+
+  const loadClassAnalytics = async () => {
+    setClassAnalyticsLoading(true);
+    try {
+      // Since the backend endpoint returns empty, we'll calculate from student data
+      const gradeGroups = {};
+      students.forEach(student => {
+        if (student.grade) {
+          if (!gradeGroups[student.grade]) {
+            gradeGroups[student.grade] = {
+              grade: student.grade,
+              totalFee: 0,
+              collected: 0,
+              pending: 0,
+              studentCount: 0
+            };
+          }
+          gradeGroups[student.grade].totalFee += student.totalFee || 0;
+          gradeGroups[student.grade].collected += student.paidAmount || 0;
+          gradeGroups[student.grade].pending += student.pendingAmount || 0;
+          gradeGroups[student.grade].studentCount += 1;
         }
-        
-        // Check if overdue
-        const today = new Date();
-        const dueDate = new Date(student.dueDate);
-        if (status !== 'paid' && today > dueDate) {
-          status = 'overdue';
-        }
-        
-        // Sort transactions by date (newest first)
-        const sortedTransactions = studentTransactions.sort((a, b) => 
-          new Date(b.date) - new Date(a.date)
-        );
-        
-        // Get last payment date
-        const lastPayment = sortedTransactions.length > 0 
-          ? sortedTransactions[0].date.split(' ')[0] // Get date part only
-          : null;
-        
-        // Create payment history
-        const paymentHistory = sortedTransactions.map(t => ({
-          id: t.id,
-          amount: t.amount,
-          date: t.date,
-          method: t.method,
-          receipt: t.receipt,
-          verifiedBy: t.verifiedBy,
-          notes: t.notes,
-          installmentNumber: t.installmentNumber
-        }));
-        
-        return {
-          ...student,
-          paid: totalPaid,
-          pending: pending,
-          status: status,
-          lastPayment: lastPayment,
-          paymentHistory: paymentHistory
-        };
       });
       
-      setStudents(updatedStudents);
-    };
+      setClassAnalytics(Object.values(gradeGroups));
+    } catch (error) {
+      console.error('Error loading class analytics:', error);
+    } finally {
+      setClassAnalyticsLoading(false);
+    }
+  };
 
-    calculateStudentData();
-  }, [transactions]);
-
-  // Recent payments for dashboard display
-  const recentPayments = useMemo(() => {
-    return transactions
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5)
-      .map(t => ({
-        id: t.id,
-        studentName: t.studentName,
-        class: t.class,
-        amount: t.amount,
-        method: t.method,
-        date: new Date(t.date).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        receipt: t.receipt,
-        status: t.status,
-        installmentNumber: t.installmentNumber
+  // NEW: Load recent payments for a specific student
+  const loadStudentRecentPayments = async (studentId, limit = 5) => {
+    setLoadingStudentPayments(prev => ({ ...prev, [studentId]: true }));
+    
+    try {
+      const response = await feeApi.get(`/students/${studentId}/recent-payments?limit=${limit}`);
+      const paymentsData = handleResponse(response);
+      
+      // Cache the results
+      setStudentRecentPaymentsCache(prev => ({
+        ...prev,
+        [studentId]: {
+          data: paymentsData,
+          timestamp: Date.now()
+        }
       }));
-  }, [transactions]);
+      
+      return paymentsData;
+    } catch (error) {
+      console.error(`Error loading recent payments for student ${studentId}:`, error);
+      handleError(error);
+      throw error;
+    } finally {
+      setLoadingStudentPayments(prev => ({ ...prev, [studentId]: false }));
+    }
+  };
 
-  // Mock data - Fee analytics by class
-  const classFeeAnalytics = useMemo(() => {
-    const analytics = students.reduce((acc, student) => {
-      const classKey = student.class;
-      if (!acc[classKey]) {
-        acc[classKey] = {
-          class: classKey,
-          totalStudents: 0,
-          totalFee: 0,
-          collected: 0,
-          pending: 0
-        };
-      }
-      
-      acc[classKey].totalStudents += 1;
-      acc[classKey].totalFee += student.totalFee;
-      acc[classKey].collected += student.paid;
-      acc[classKey].pending += student.pending;
-      
-      return acc;
-    }, {});
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    setStatsLoading(true);
+    setTrendLoading(true);
+    setPaymentMethodsLoading(true);
+    setOverdueLoading(true);
+    setRecentPaymentsLoading(true);
+    setStudentsLoading(true);
+    setClassAnalyticsLoading(true);
     
-    return Object.values(analytics).map(cls => ({
-      ...cls,
-      percentage: cls.totalFee > 0 ? Math.round((cls.collected / cls.totalFee) * 100) : 0,
-      trend: Math.random() > 0.5 ? Math.floor(Math.random() * 10) : -Math.floor(Math.random() * 10)
-    }));
-  }, [students]);
-
-  // Chart data
-  const collectionTrendData = [
-    { month: 'Jan', collected: 4500000, target: 5000000, overdue: 450000 },
-    { month: 'Feb', collected: 5200000, target: 5000000, overdue: 320000 },
-    { month: 'Mar', collected: 4800000, target: 5000000, overdue: 550000 },
-    { month: 'Apr', collected: 5500000, target: 5500000, overdue: 280000 },
-    { month: 'May', collected: 6000000, target: 5500000, overdue: 210000 },
-    { month: 'Jun', collected: 5800000, target: 6000000, overdue: 390000 },
-  ];
-
-  const paymentMethodsData = useMemo(() => {
-    const methods = {};
-    transactions.forEach(t => {
-      if (!methods[t.method]) {
-        methods[t.method] = { count: 0, amount: 0 };
-      }
-      methods[t.method].count += 1;
-      methods[t.method].amount += t.amount;
-    });
-    
-    const totalTransactions = transactions.length;
-    const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
-    
-    return Object.entries(methods).map(([method, data]) => {
-      const config = {
-        online: { name: 'Online Banking', color: '#3b82f6' },
-        card: { name: 'Credit/Debit', color: '#10b981' },
-        upi: { name: 'UPI', color: '#8b5cf6' },
-        cash: { name: 'Cash', color: '#f59e0b' },
-        cheque: { name: 'Cheque', color: '#6b7280' },
-        bank: { name: 'Bank Transfer', color: '#8b5cf6' }
-      };
-      
-      const methodConfig = config[method] || { name: method, color: '#6b7280' };
-      
-      return {
-        name: methodConfig.name,
-        value: Math.round((data.count / totalTransactions) * 100),
-        color: methodConfig.color,
-        transactions: data.count,
-        amount: data.amount
-      };
-    });
-  }, [transactions]);
-
-  const overdueDistributionData = useMemo(() => {
-    const overdueStudents = students.filter(s => s.status === 'overdue');
-    
-    // Calculate overdue ranges
-    const today = new Date();
-    const ranges = [
-      { range: '1-7 days', min: 0, max: 7 },
-      { range: '8-15 days', min: 8, max: 15 },
-      { range: '16-30 days', min: 16, max: 30 },
-      { range: '30+ days', min: 31, max: 365 }
-    ];
-    
-    return ranges.map(range => {
-      const studentsInRange = overdueStudents.filter(s => {
-        const dueDate = new Date(s.dueDate);
-        const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-        return daysOverdue >= range.min && daysOverdue <= range.max;
-      });
-      
-      return {
-        range: range.range,
-        count: studentsInRange.length,
-        amount: studentsInRange.reduce((sum, s) => sum + s.pending, 0)
-      };
-    });
-  }, [students]);
+    try {
+      await Promise.all([
+        loadDashboardStats(),
+        loadCollectionTrend(selectedTerm),
+        loadPaymentMethods(),
+        loadOverdueDistribution(),
+        loadRecentPayments(5),
+        loadStudents(),
+        loadClassAnalytics()
+      ]);
+      showSuccessAlert('Data Refreshed', 'All fee collection data has been refreshed.');
+    } catch (error) {
+      showErrorAlert('Refresh Failed', 'Failed to refresh data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Enhanced notification system
   const addNotification = (type, message, action) => {
@@ -667,230 +721,194 @@ const FeeCollection = () => {
   };
 
   // Handle viewing all transactions for a student
-  const handleViewAllTransactions = (student) => {
-    const studentTransactions = transactions.filter(t => t.studentId === student.id);
-    const totalPaid = studentTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const totalDue = student.totalFee - totalPaid;
-    
-    MySwal.fire({
-      title: <span className="text-gray-900">Complete Payment History - {student.name}</span>,
-      html: (
-        <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
-          {/* Student Summary */}
-          <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-lg text-gray-900">{student.name}</h3>
-                <p className="text-sm text-gray-600">{student.class} • {student.guardian}</p>
+  const handleViewAllTransactions = async (student) => {
+    setIsLoading(true);
+    try {
+      const response = await feeApi.get(`/students/${student.studentId}/payment-history`);
+      const history = handleResponse(response);
+      
+      MySwal.fire({
+        title: <span className="text-gray-900">Complete Payment History - {student.studentName}</span>,
+        html: (
+          <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Student Summary */}
+            <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-lg text-gray-900">{student.studentName}</h3>
+                  <p className="text-sm text-gray-600">{student.grade} • {student.guardianName}</p>
+                </div>
+                <FeeStatusBadge status={student.feeStatus} />
               </div>
-              <FeeStatusBadge status={student.status} />
-            </div>
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Total Fee</p>
-                <p className="text-lg font-bold">₹{student.totalFee.toLocaleString()}</p>
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Total Fee</p>
+                  <p className="text-lg font-bold">₹{student.totalFee?.toLocaleString('en-IN') || '0'}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Total Paid</p>
+                  <p className="text-lg font-bold text-emerald-600">₹{history.totalPaid?.toLocaleString('en-IN') || '0'}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Pending</p>
+                  <p className="text-lg font-bold text-rose-600">₹{history.totalPending?.toLocaleString('en-IN') || '0'}</p>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Total Paid</p>
-                <p className="text-lg font-bold text-emerald-600">₹{totalPaid.toLocaleString()}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Pending</p>
-                <p className="text-lg font-bold text-rose-600">₹{totalDue.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-600">
-                <span>Payment Progress</span>
-                <span className="font-medium text-emerald-600">
-                  {((totalPaid / student.totalFee) * 100).toFixed(1)}%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                <div 
-                  className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(totalPaid / student.totalFee) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Transaction List */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="font-semibold text-gray-900">
-                All Transactions ({studentTransactions.length})
-              </h4>
-            </div>
-            
-            {studentTransactions.length > 0 ? (
-              <div className="space-y-3">
-                {studentTransactions.map((transaction) => (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs text-gray-600">
+                  <span>Payment Progress</span>
+                  <span className="font-medium text-emerald-600">
+                    {history.paymentProgress || '0%'}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                   <div 
-                    key={transaction.id} 
-                    className="p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          transaction.method === 'online' ? 'bg-blue-100' :
-                          transaction.method === 'card' ? 'bg-emerald-100' :
-                          transaction.method === 'upi' ? 'bg-purple-100' :
-                          transaction.method === 'cash' ? 'bg-amber-100' : 'bg-gray-100'
-                        }`}>
-                          {transaction.method === 'online' ? <CreditCard className="w-4 h-4 text-blue-600" /> :
-                           transaction.method === 'card' ? <Card className="w-4 h-4 text-emerald-600" /> :
-                           transaction.method === 'upi' ? <QrCode className="w-4 h-4 text-purple-600" /> :
-                           transaction.method === 'cash' ? <Banknote className="w-4 h-4 text-amber-600" /> :
-                           <FileText className="w-4 h-4 text-gray-600" />}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-gray-900">{transaction.receipt}</p>
-                            {transaction.installmentNumber && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                Installment {transaction.installmentNumber}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            {new Date(transaction.date).toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">{transaction.verifiedBy}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-900">₹{transaction.amount.toLocaleString()}</p>
-                        <PaymentMethodBadge method={transaction.method} />
-                      </div>
-                    </div>
-                    
-                    {transaction.notes && (
-                      <div className="mt-2 pt-2 border-t border-gray-100">
-                        <p className="text-xs text-gray-600">{transaction.notes}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                    style={{ 
+                      width: history.paymentProgress || 
+                      `${calculatePaymentPercentage(student.totalFee, student.paidAmount)}%` 
+                    }}
+                  />
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-lg">
-                <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-900 font-medium">No transactions found</p>
-                <p className="text-sm text-gray-600 mt-1">No payments recorded for this student yet</p>
-              </div>
-            )}
-          </div>
+            </div>
 
-          {/* Payment Timeline */}
-          {studentTransactions.length > 0 && (
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-3">Payment Timeline</h4>
-              <div className="space-y-4">
-                {studentTransactions.map((transaction, index) => (
-                  <div key={transaction.id} className="flex items-start">
-                    <div className="flex flex-col items-center mr-4">
-                      <div className={`w-3 h-3 rounded-full ${
-                        index === 0 ? 'bg-emerald-500' : 'bg-blue-500'
-                      }`} />
-                      {index < studentTransactions.length - 1 && (
-                        <div className="w-0.5 h-8 bg-gray-300 mt-1" />
+            {/* Transaction List */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-gray-900">
+                  All Transactions ({history.transactions?.length || 0})
+                </h4>
+              </div>
+              
+              {history.transactions && history.transactions.length > 0 ? (
+                <div className="space-y-3">
+                  {history.transactions.map((transaction) => (
+                    <div 
+                      key={transaction.id} 
+                      className="p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${
+                            transaction.paymentMethod === 'ONLINE_BANKING' ? 'bg-blue-100' :
+                            transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD' ? 'bg-emerald-100' :
+                            transaction.paymentMethod === 'UPI' ? 'bg-purple-100' :
+                            transaction.paymentMethod === 'CASH' ? 'bg-amber-100' : 'bg-gray-100'
+                          }`}>
+                            {transaction.paymentMethod === 'ONLINE_BANKING' ? <CreditCard className="w-4 h-4 text-blue-600" /> :
+                             transaction.paymentMethod === 'CREDIT_CARD' || transaction.paymentMethod === 'DEBIT_CARD' ? <Card className="w-4 h-4 text-emerald-600" /> :
+                             transaction.paymentMethod === 'UPI' ? <QrCode className="w-4 h-4 text-purple-600" /> :
+                             transaction.paymentMethod === 'CASH' ? <Banknote className="w-4 h-4 text-amber-600" /> :
+                             <FileText className="w-4 h-4 text-gray-600" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-gray-900">{transaction.receiptNumber}</p>
+                              {transaction.installmentNumber && (
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                  Installment {transaction.installmentNumber}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {new Date(transaction.paymentDate).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">{transaction.verifiedBy || 'System'}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900">₹{transaction.amount?.toLocaleString('en-IN') || '0'}</p>
+                          <PaymentMethodBadge method={transaction.paymentMethod} />
+                        </div>
+                      </div>
+                      
+                      {transaction.notes && (
+                        <div className="mt-2 pt-2 border-t border-gray-100">
+                          <p className="text-xs text-gray-600">{transaction.notes}</p>
+                        </div>
+                      )}
+                      
+                      {transaction.breakdown && transaction.breakdown.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs font-medium text-gray-700 mb-2">Fee Breakdown:</p>
+                          <div className="space-y-1">
+                            {transaction.breakdown.map((item, idx) => (
+                              <div key={idx} className="flex justify-between text-xs">
+                                <span className="text-gray-600">{item.category}</span>
+                                <span className="font-medium">₹{item.amount?.toFixed(2)} ({item.percentage}%)</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between">
-                        <p className="font-medium text-gray-900">{transaction.receipt}</p>
-                        <p className="text-sm font-bold">₹{transaction.amount.toLocaleString()}</p>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {new Date(transaction.date).toLocaleDateString('en-IN', {
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
+                  <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-900 font-medium">No transactions found</p>
+                  <p className="text-sm text-gray-600 mt-1">No payments recorded for this student yet</p>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Summary */}
+            {history.summary && (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-3">Payment Summary</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Total Transactions</span>
+                    <span className="font-medium">{history.summary.totalTransactions || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">First Payment</span>
+                    <span className="font-medium">
+                      {history.summary.firstPayment ? 
+                        new Date(history.summary.firstPayment).toLocaleDateString('en-IN', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric'
-                        })}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">{transaction.method.toUpperCase()} • {transaction.verifiedBy}</p>
-                      {transaction.notes && (
-                        <p className="text-xs text-gray-500 mt-1">{transaction.notes}</p>
-                      )}
-                    </div>
+                        }) : 'N/A'}
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Payment Summary */}
-          {studentTransactions.length > 0 && (
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-3">Payment Summary</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Number of Payments</span>
-                  <span className="font-medium">{studentTransactions.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">First Payment</span>
-                  <span className="font-medium">
-                    {new Date(studentTransactions[studentTransactions.length - 1].date).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Last Payment</span>
-                  <span className="font-medium">
-                    {new Date(studentTransactions[0].date).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Payment Methods Used</span>
-                  <span className="font-medium">
-                    {[...new Set(studentTransactions.map(t => t.method))].join(', ')}
-                  </span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Last Payment</span>
+                    <span className="font-medium">
+                      {history.summary.lastPayment ? 
+                        new Date(history.summary.lastPayment).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        }) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Payment Methods Used</span>
+                    <span className="font-medium">
+                      {history.summary.paymentMethods?.join(', ') || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Average Payment Amount</span>
+                    <span className="font-medium">
+                      ₹{history.summary.averagePaymentAmount?.toLocaleString('en-IN') || '0'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      ),
-      width: 700,
-      showConfirmButton: false,
-      showCloseButton: true,
-      customClass: {
-        popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold mb-4'
-      }
-    });
-  };
-
-  // Show recent payments popup
-  const handleShowRecentPayments = (student) => {
-    const studentTransactions = transactions.filter(t => t.studentId === student.id);
-    
-    if (studentTransactions.length === 0) {
-      MySwal.fire({
-        title: <span className="text-gray-900">No Payments</span>,
-        html: (
-          <div className="text-center py-6">
-            <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-900 font-medium">No payments recorded</p>
-            <p className="text-sm text-gray-600 mt-1">No transactions found for this student</p>
+            )}
           </div>
         ),
-        width: 400,
+        width: 700,
         showConfirmButton: false,
         showCloseButton: true,
         customClass: {
@@ -898,70 +916,105 @@ const FeeCollection = () => {
           title: 'text-lg font-bold mb-4'
         }
       });
+    } catch (error) {
+      console.error('Error loading payment history:', error);
+      handleError(error);
+      showErrorAlert('Error', 'Failed to load payment history. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // FIXED: Enhanced Recent Payments Function with NEW endpoint
+  const handleShowRecentPayments = async (student) => {
+    const studentId = student.studentId;
+    
+    // Check if already loading
+    if (loadingStudentPayments[studentId]) {
       return;
     }
+    
+    // Check cache first (5 minute cache)
+    const cachedData = studentRecentPaymentsCache[studentId];
+    const cacheAge = cachedData ? Date.now() - cachedData.timestamp : Infinity;
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    
+    let payments;
+    
+    if (cachedData && cacheAge < CACHE_DURATION) {
+      // Use cached data
+      payments = cachedData.data;
+    } else {
+      // Load fresh data
+      try {
+        payments = await loadStudentRecentPayments(studentId, 5);
+      } catch (error) {
+        // Handle error - show appropriate message
+        if (student.paymentCount > 0) {
+          showErrorAlert(
+            'Could not load recent payments',
+            `This student has ${student.paymentCount} payment${student.paymentCount > 1 ? 's' : ''} but we couldn't load the recent transactions.`
+          );
+        } else {
+          showNoPaymentsModal(student);
+        }
+        return;
+      }
+    }
+    
+    // Show the modal
+    if (!payments || payments.length === 0) {
+      showNoPaymentsModal(student);
+    } else {
+      showRecentPaymentsModal(student, payments);
+    }
+  };
+
+  // FIXED: Show recent payments modal
+  const showRecentPaymentsModal = (student, payments) => {
+    const isLoading = loadingStudentPayments[student.studentId];
 
     MySwal.fire({
-      title: <span className="text-gray-900">Recent Payments - {student.name}</span>,
+      title: <span className="text-gray-900">Recent Payments - {student.studentName}</span>,
       html: (
         <div className="text-left space-y-4 max-h-[60vh] overflow-y-auto">
-          <div className="text-sm text-gray-600 mb-3">
-            Showing {studentTransactions.length} transaction{studentTransactions.length > 1 ? 's' : ''}
-          </div>
-          
-          {studentTransactions.slice(0, 5).map((transaction) => (
-            <div 
-              key={transaction.id} 
-              className="p-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3 h-3 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-900">
-                    {new Date(transaction.date).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </span>
-                </div>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                  {transaction.receipt}
-                </span>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <span className="ml-2 text-gray-600">Loading payments...</span>
+            </div>
+          ) : (
+            <>
+              <div className="text-sm text-gray-600 mb-3">
+                Showing {payments.length} recent transaction{payments.length > 1 ? 's' : ''} 
+                {student.paymentCount > payments.length && (
+                  <span> of {student.paymentCount} total</span>
+                )}
               </div>
               
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <PaymentMethodBadge method={transaction.method} />
-                  {transaction.installmentNumber && (
-                    <span className="text-xs text-gray-600">
-                      Installment {transaction.installmentNumber}
-                    </span>
-                  )}
-                </div>
-                <span className="text-lg font-bold text-emerald-600">
-                  ₹{transaction.amount.toLocaleString()}
-                </span>
-              </div>
+              {payments.map((payment) => (
+                <PaymentTransactionCard 
+                  key={payment.id} 
+                  payment={payment} 
+                  student={student}
+                />
+              ))}
               
-              {transaction.notes && (
-                <p className="text-xs text-gray-500 mt-2">{transaction.notes}</p>
+              {student.paymentCount > 5 && (
+                <div className="text-center pt-2 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      MySwal.close();
+                      handleViewAllTransactions(student);
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium mt-3 flex items-center justify-center gap-1 w-full"
+                  >
+                    <span>View complete payment history ({student.paymentCount} transactions)</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
               )}
-            </div>
-          ))}
-          
-          {studentTransactions.length > 5 && (
-            <div className="text-center pt-2">
-              <button
-                onClick={() => {
-                  MySwal.close();
-                  handleViewAllTransactions(student);
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                View all {studentTransactions.length} transactions →
-              </button>
-            </div>
+            </>
           )}
         </div>
       ),
@@ -975,7 +1028,44 @@ const FeeCollection = () => {
     });
   };
 
-  // Enhanced Email Reminder Function with Popup
+  // FIXED: Show no payments modal
+  const showNoPaymentsModal = (student) => {
+    MySwal.fire({
+      title: <span className="text-gray-900">No Recent Payments</span>,
+      html: (
+        <div className="text-center py-6">
+          <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-900 font-medium">No recent payments found</p>
+          <p className="text-sm text-gray-600 mt-1">
+            {student.paymentCount > 0 
+              ? `This student has ${student.paymentCount} payment${student.paymentCount > 1 ? 's' : ''}, but none in the recent period.`
+              : 'No payments recorded for this student yet.'}
+          </p>
+          {student.paymentCount > 0 && (
+            <button
+              onClick={() => {
+                MySwal.close();
+                handleViewAllTransactions(student);
+              }}
+              className="mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 mx-auto"
+            >
+              <span>View all {student.paymentCount} transaction{student.paymentCount > 1 ? 's' : ''}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      ),
+      width: 400,
+      showConfirmButton: false,
+      showCloseButton: true,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl',
+        title: 'text-lg font-bold mb-4'
+      }
+    });
+  };
+
+  // Enhanced Email Reminder Function
   const handleEmailReminder = async (student) => {
     const { value: formValues } = await MySwal.fire({
       title: <span className="text-gray-900">Send Email Reminder</span>,
@@ -985,14 +1075,14 @@ const FeeCollection = () => {
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-gray-900">{student.name}</h3>
-                <p className="text-sm text-gray-600">{student.class} • {student.guardian}</p>
+                <h3 className="font-semibold text-gray-900">{student.studentName}</h3>
+                <p className="text-sm text-gray-600">{student.grade} • {student.guardianName}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-rose-600">
-                  Pending: ₹{student.pending.toLocaleString()}
+                  Pending: ₹{student.pendingAmount?.toLocaleString('en-IN') || '0'}
                 </p>
-                <p className="text-xs text-gray-500">Due: {student.dueDate}</p>
+                <p className="text-xs text-gray-500">Due: {student.dueDate || 'N/A'}</p>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -1002,7 +1092,7 @@ const FeeCollection = () => {
               </div>
               <div>
                 <p className="text-xs text-gray-500">Reminders Sent</p>
-                <p className="text-sm font-medium">{student.remindersSent} times</p>
+                <p className="text-sm font-medium">{student.remindersSent || 0} times</p>
               </div>
             </div>
           </div>
@@ -1013,28 +1103,24 @@ const FeeCollection = () => {
             <div className="space-y-2">
               {[
                 {
-                  id: 'gentle',
+                  id: 'GENTLE',
                   title: 'Gentle Reminder',
                   description: 'Polite reminder about pending fee',
-                  defaultSubject: 'Gentle Reminder: School Fee Pending',
                 },
                 {
-                  id: 'due',
+                  id: 'DUE_DATE',
                   title: 'Due Date Reminder',
                   description: 'Urgent reminder about approaching due date',
-                  defaultSubject: 'URGENT: Fee Due Date Approaching',
                 },
                 {
-                  id: 'overdue',
+                  id: 'OVERDUE',
                   title: 'Overdue Notice',
                   description: 'Formal notice for overdue payment',
-                  defaultSubject: 'OVERDUE NOTICE: Immediate Action Required',
                 },
                 {
-                  id: 'final',
+                  id: 'FINAL_NOTICE',
                   title: 'Final Notice',
                   description: 'Final warning before further action',
-                  defaultSubject: 'FINAL NOTICE: School Fee Overdue',
                 },
               ].map((template) => (
                 <label
@@ -1045,7 +1131,7 @@ const FeeCollection = () => {
                     type="radio"
                     name="emailTemplate"
                     value={template.id}
-                    defaultChecked={template.id === 'gentle'}
+                    defaultChecked={template.id === 'GENTLE'}
                     className="mt-1 text-blue-600"
                   />
                   <div className="flex-1">
@@ -1064,9 +1150,6 @@ const FeeCollection = () => {
               <button
                 type="button"
                 className="text-xs text-blue-600 hover:text-blue-800"
-                onClick={() => {
-                  // Reset to default template
-                }}
               >
                 Reset to Default
               </button>
@@ -1080,7 +1163,7 @@ const FeeCollection = () => {
                 <input
                   type="text"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  defaultValue={`Gentle Reminder: School Fee Pending for ${student.name}`}
+                  defaultValue={`Gentle Reminder: School Fee Pending for ${student.studentName}`}
                 />
               </div>
               
@@ -1090,15 +1173,15 @@ const FeeCollection = () => {
                 </label>
                 <textarea
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-37.5"
-                  defaultValue={`Dear ${student.guardian},
+                  defaultValue={`Dear ${student.guardianName},
 
-This is a gentle reminder that the school fee for ${student.name} (${student.class}) is pending.
+This is a gentle reminder that the school fee for ${student.studentName} (${student.grade}) is pending.
 
 Payment Details:
-• Total Fee: ₹${student.totalFee.toLocaleString()}
-• Amount Paid: ₹${student.paid.toLocaleString()}
-• Amount Due: ₹${student.pending.toLocaleString()}
-• Due Date: ${student.dueDate}
+• Total Fee: ₹${student.totalFee?.toLocaleString('en-IN') || '0'}
+• Amount Paid: ₹${student.paidAmount?.toLocaleString('en-IN') || '0'}
+• Amount Due: ₹${student.pendingAmount?.toLocaleString('en-IN') || '0'}
+• Due Date: ${student.dueDate || 'N/A'}
 
 Payment Methods Available:
 1. Online Payment (Portal/UPI)
@@ -1141,15 +1224,6 @@ School Accounts Department`}
                   Send copy to school accounts department
                 </span>
               </label>
-              <label className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  className="rounded text-blue-600"
-                />
-                <span className="text-sm text-gray-700">
-                  Send follow-up reminder in 3 days if not paid
-                </span>
-              </label>
             </div>
           </div>
         </div>
@@ -1166,44 +1240,39 @@ School Accounts Department`}
         title: 'text-lg font-bold',
       },
       preConfirm: () => {
+        const subject = document.querySelector('input[type="text"]').value;
+        const content = document.querySelector('textarea').value;
+        const template = document.querySelector('input[name="emailTemplate"]:checked').value;
+        
         return {
-          success: true,
-          reminderCount: student.remindersSent + 1,
+          studentId: student.studentId,
+          channel: 'EMAIL',
+          template: template,
+          customContent: content,
+          attachInvoice: true,
+          sendCopyToAccounts: true
         };
       },
     });
 
-    if (formValues && formValues.success) {
+    if (formValues) {
       setIsLoading(true);
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Update student's reminder count
-        const updatedStudents = students.map(s => 
-          s.id === student.id 
-            ? { 
-                ...s, 
-                remindersSent: formValues.reminderCount, 
-                lastReminder: new Date().toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric', 
-                  year: 'numeric' 
-                }) 
-              }
-            : s
-        );
-        
-        setStudents(updatedStudents);
+        const response = await feeApi.post('/reminders/email', formValues);
+        const result = handleResponse(response);
         
         showSuccessAlert(
           'Email Sent Successfully!',
-          `Email reminder has been sent to ${student.guardian} (${student.email}). Total reminders sent: ${formValues.reminderCount}`
+          `Email reminder has been sent to ${student.guardianName} (${student.email}).`
         );
         
-        addNotification('success', `Email sent to ${student.guardian}`);
+        addNotification('success', `Email sent to ${student.guardianName}`);
+        
+        // Refresh student data
+        await loadStudents();
         
       } catch (error) {
+        handleError(error);
         showErrorAlert('Failed to Send', 'There was an error sending the email. Please try again.');
       } finally {
         setIsLoading(false);
@@ -1211,7 +1280,7 @@ School Accounts Department`}
     }
   };
 
-  // Enhanced SMS Reminder Function with Popup
+  // Enhanced SMS Reminder Function
   const handleSMSReminder = async (student) => {
     const { value: formValues } = await MySwal.fire({
       title: <span className="text-gray-900">Send SMS Reminder</span>,
@@ -1221,8 +1290,8 @@ School Accounts Department`}
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-gray-900">{student.name}</h3>
-                <p className="text-sm text-gray-600">{student.class} • {student.guardian}</p>
+                <h3 className="font-semibold text-gray-900">{student.studentName}</h3>
+                <p className="text-sm text-gray-600">{student.grade} • {student.guardianName}</p>
               </div>
               <div className="text-right">
                 <Phone className="w-5 h-5 text-gray-400 inline mr-1" />
@@ -1231,12 +1300,8 @@ School Accounts Department`}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
               <div>
-                <p className="text-xs text-gray-500">SMS Balance</p>
-                <p className="text-sm font-semibold text-emerald-600">1,245 SMS</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">Previous SMS Sent</p>
-                <p className="text-sm font-medium">{student.remindersSent} times</p>
+                <p className="text-xs text-gray-500">Reminders Sent</p>
+                <p className="text-sm font-medium">{student.remindersSent || 0} times</p>
               </div>
             </div>
           </div>
@@ -1247,22 +1312,22 @@ School Accounts Department`}
             <div className="space-y-2">
               {[
                 {
-                  id: 'gentle',
+                  id: 'GENTLE',
                   title: 'Gentle SMS',
-                  content: `Dear parent, fee for ${student.name} is pending. Amount: ₹${student.pending}. Due: ${student.dueDate}. School Accounts`,
+                  content: `Dear parent, fee for ${student.studentName} is pending. Amount: ₹${student.pendingAmount}. Due: ${student.dueDate}. School Accounts`,
                   charCount: 120,
                 },
                 {
-                  id: 'urgent',
+                  id: 'OVERDUE',
                   title: 'Urgent SMS',
-                  content: `URGENT: Fee for ${student.name} overdue. Pay ₹${student.pending} immediately. Last date: ${student.dueDate}. Contact school office.`,
-                  charCount: 135,
+                  content: `URGENT: Fee for ${student.studentName} overdue. Pay ₹${student.pendingAmount} immediately. Contact school office.`,
+                  charCount: 110,
                 },
                 {
-                  id: 'quick',
-                  title: 'Quick Reminder',
-                  content: `Reminder: School fee pending for ${student.name}. Amount: ₹${student.pending}. Pay online: [payment-link]`,
-                  charCount: 110,
+                  id: 'FINAL_NOTICE',
+                  title: 'Final Notice',
+                  content: `FINAL NOTICE: School fee overdue for ${student.studentName}. Pay ₹${student.pendingAmount} now.`,
+                  charCount: 90,
                 },
               ].map((template) => (
                 <label
@@ -1273,7 +1338,7 @@ School Accounts Department`}
                     type="radio"
                     name="smsTemplate"
                     value={template.id}
-                    defaultChecked={template.id === 'gentle'}
+                    defaultChecked={template.id === 'GENTLE'}
                     className="mt-1 text-blue-600"
                   />
                   <div className="flex-1">
@@ -1299,7 +1364,7 @@ School Accounts Department`}
             
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-25 font-mono"
-              defaultValue={`Dear ${student.guardian}, fee for ${student.name} (${student.class}) is pending. Amount due: ₹${student.pending}. Due date: ${student.dueDate}. Pay online or visit school office. School Accounts`}
+              defaultValue={`Dear ${student.guardianName}, fee for ${student.studentName} (${student.grade}) is pending. Amount due: ₹${student.pendingAmount}. Due date: ${student.dueDate}. Pay online or visit school office. School Accounts`}
               onChange={(e) => {
                 const charCount = e.target.value.length;
                 document.getElementById('charCount').textContent = charCount;
@@ -1329,44 +1394,36 @@ School Accounts Department`}
           MySwal.showValidationMessage('Please enter SMS content');
           return false;
         }
+        const template = document.querySelector('input[name="smsTemplate"]:checked').value;
+        
         return {
-          success: true,
-          content: smsContent,
-          reminderCount: student.remindersSent + 1,
+          studentId: student.studentId,
+          channel: 'SMS',
+          template: template,
+          customContent: smsContent,
+          attachInvoice: false
         };
       },
     });
 
-    if (formValues && formValues.success) {
+    if (formValues) {
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Update student's reminder count
-        const updatedStudents = students.map(s => 
-          s.id === student.id 
-            ? { 
-                ...s, 
-                remindersSent: formValues.reminderCount, 
-                lastReminder: new Date().toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric', 
-                  year: 'numeric' 
-                }) 
-              }
-            : s
-        );
-        
-        setStudents(updatedStudents);
+        const response = await feeApi.post('/reminders/sms', formValues);
+        const result = handleResponse(response);
         
         showSuccessAlert(
           'SMS Sent Successfully!',
-          `SMS reminder has been sent to ${student.guardian} (${student.contact}). Delivery confirmation will be sent shortly.`
+          `SMS reminder has been sent to ${student.guardianName} (${student.contact}).`
         );
         
-        addNotification('success', `SMS sent to ${student.guardian}`);
+        addNotification('success', `SMS sent to ${student.guardianName}`);
+        
+        // Refresh student data
+        await loadStudents();
         
       } catch (error) {
+        handleError(error);
         showErrorAlert('Failed to Send', 'There was an error sending the SMS. Please try again.');
       } finally {
         setIsLoading(false);
@@ -1375,7 +1432,7 @@ School Accounts Department`}
   };
 
   const sendBulkReminders = async () => {
-    const selected = filteredStudents.filter(s => selectedStudents.includes(s.id));
+    const selected = filteredStudents.filter(s => selectedStudents.includes(s.studentId));
     if (selected.length === 0) {
       showWarningAlert(
         'No Students Selected',
@@ -1393,7 +1450,7 @@ School Accounts Department`}
               {selected.length} student{selected.length > 1 ? 's' : ''} selected
             </p>
             <p className="text-xs text-blue-700 mt-1">
-              Total pending amount: ₹{selected.reduce((sum, s) => sum + s.pending, 0).toLocaleString()}
+              Total pending amount: ₹{selected.reduce((sum, s) => sum + (s.pendingAmount || 0), 0).toLocaleString('en-IN')}
             </p>
           </div>
           
@@ -1404,13 +1461,18 @@ School Accounts Department`}
               </label>
               <div className="space-y-2">
                 {[
-                  { id: 'email', label: 'Email', icon: Mail },
-                  { id: 'sms', label: 'SMS', icon: MessageSquare },
-                  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
-                  { id: 'app', label: 'In-app Notification', icon: Bell }
+                  { id: 'EMAIL', label: 'Email', icon: Mail },
+                  { id: 'SMS', label: 'SMS', icon: MessageSquare },
+                  { id: 'WHATSAPP', label: 'WhatsApp', icon: MessageCircle },
                 ].map(channel => (
                   <label key={channel.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
-                    <input type="checkbox" defaultChecked={channel.id === 'email'} className="text-blue-600 rounded" />
+                    <input 
+                      type="radio" 
+                      name="bulkChannel" 
+                      value={channel.id} 
+                      defaultChecked={channel.id === 'EMAIL'} 
+                      className="text-blue-600 rounded" 
+                    />
                     <channel.icon className="w-4 h-4 text-gray-600" />
                     <span className="text-sm text-gray-700">{channel.label}</span>
                   </label>
@@ -1420,24 +1482,13 @@ School Accounts Department`}
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reminder Type
+                Reminder Template
               </label>
               <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option>Standard Reminder</option>
-                <option>Overdue Notice</option>
-                <option>Pre-due Reminder</option>
-                <option>Installment Reminder</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Schedule
-              </label>
-              <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-                <option>Send Now</option>
-                <option>Schedule for Later</option>
-                <option>Send Daily until Paid</option>
+                <option value="GENTLE">Gentle Reminder</option>
+                <option value="DUE_DATE">Due Date Reminder</option>
+                <option value="OVERDUE">Overdue Notice</option>
+                <option value="FINAL_NOTICE">Final Notice</option>
               </select>
             </div>
           </div>
@@ -1452,20 +1503,36 @@ School Accounts Department`}
       customClass: {
         popup: 'rounded-2xl border border-gray-200 max-w-md shadow-xl',
         title: 'text-lg font-bold'
-      }
+      },
+      preConfirm: () => {
+        const channel = document.querySelector('input[name="bulkChannel"]:checked').value;
+        const template = document.querySelector('select').value;
+        
+        return {
+          studentIds: selected.map(s => s.studentId),
+          channel: channel,
+          template: template,
+          attachInvoice: true
+        };
+      },
     });
 
     if (formValues) {
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        showSuccessAlert(
-          'Bulk Reminders Sent!',
-          `Reminders have been sent to ${selected.length} student${selected.length > 1 ? 's' : ''}`
-        );
-        addNotification('success', `Bulk reminders sent to ${selected.length} parents`);
-        setSelectedStudents([]);
+        const response = await feeApi.post('/reminders/bulk', formValues);
+        const result = handleResponse(response);
+        
+        if (result) {
+          showSuccessAlert(
+            'Bulk Reminders Sent!',
+            `Successfully sent ${result.successfullySent} reminders. ${result.failed > 0 ? `${result.failed} failed.` : ''}`
+          );
+          addNotification('success', `Bulk reminders sent to ${result.successfullySent} parents`);
+          setSelectedStudents([]);
+        }
       } catch (error) {
+        handleError(error);
         showErrorAlert('Operation Failed', 'There was an error sending bulk reminders.');
       } finally {
         setIsLoading(false);
@@ -1476,21 +1543,42 @@ School Accounts Department`}
   const handleExportData = async (format) => {
     const result = await showConfirmDialog(
       'Export Data',
-      `Export fee collection data to ${format === 'excel' ? 'Excel' : 'PDF'} format?`,
-      `Export to ${format === 'excel' ? 'Excel' : 'PDF'}`,
+      `Export fee collection data to ${format} format?`,
+      `Export to ${format}`,
       'Cancel'
     );
     
     if (result.isConfirmed) {
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        showSuccessAlert(
-          'Export Successful!',
-          `Data has been exported to ${format === 'excel' ? 'Excel' : 'PDF'} format`
-        );
+        // Create filter request based on current filters
+        const filterRequest = {
+          grade: selectedClass !== 'All' ? selectedClass : null,
+          feeStatus: filterStatus !== 'all' ? filterStatus.toUpperCase() : null,
+          searchQuery: searchQuery || null,
+          page: 0,
+          size: 1000,
+          sortBy: 'createdAt',
+          sortDirection: 'DESC'
+        };
+
+        const response = await feeApi.post('/bulk/export', filterRequest);
+        const exportInfo = handleResponse(response);
+        
+        if (exportInfo.message === "Export functionality not yet implemented") {
+          showWarningAlert(
+            'Feature Not Available',
+            'Export functionality is not yet implemented in the backend. Please check back later.'
+          );
+        } else {
+          showSuccessAlert(
+            'Export Initiated!',
+            `Export job has been queued. Download will be available at: ${exportInfo.downloadUrl}`
+          );
+        }
       } catch (error) {
-        showErrorAlert('Export Failed', 'There was an error exporting the data.');
+        handleError(error);
+        showErrorAlert('Export Failed', 'There was an error initiating the export.');
       } finally {
         setIsLoading(false);
       }
@@ -1507,13 +1595,21 @@ School Accounts Department`}
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Start Date
               </label>
-              <input type="date" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <input 
+                type="date" 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                defaultValue={new Date().toISOString().split('T')[0]}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 End Date
               </label>
-              <input type="date" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+              <input 
+                type="date" 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                defaultValue={new Date().toISOString().split('T')[0]}
+              />
             </div>
           </div>
           
@@ -1523,10 +1619,10 @@ School Accounts Department`}
                 Select Classes
               </label>
               <div className="space-y-2 max-h-40 overflow-y-auto">
-                {classFeeAnalytics.map(cls => (
-                  <label key={cls.class} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                {classAnalytics.map(cls => (
+                  <label key={cls.grade} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
                     <input type="checkbox" defaultChecked className="text-blue-600 rounded" />
-                    <span className="text-sm">{cls.class}</span>
+                    <span className="text-sm">{cls.grade}</span>
                   </label>
                 ))}
               </div>
@@ -1538,9 +1634,10 @@ School Accounts Department`}
               Report Format
             </label>
             <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-              <option>Detailed Report</option>
-              <option>Summary Report</option>
-              <option>With Charts</option>
+              <option value="PDF">PDF</option>
+              <option value="EXCEL">Excel (XLSX)</option>
+              <option value="CSV">CSV</option>
+              <option value="HTML">HTML</option>
             </select>
           </div>
         </div>
@@ -1554,19 +1651,51 @@ School Accounts Department`}
       customClass: {
         popup: 'rounded-2xl border border-gray-200 max-w-md shadow-xl',
         title: 'text-lg font-bold'
-      }
+      },
+      preConfirm: () => {
+        const startDate = document.querySelector('input[type="date"]:first-of-type').value;
+        const endDate = document.querySelector('input[type="date"]:last-of-type').value;
+        const format = document.querySelector('select').value;
+        
+        if (!startDate || !endDate) {
+          MySwal.showValidationMessage('Please select both start and end dates');
+          return false;
+        }
+
+        // Use the proper enum mapping
+        const reportType = reportTypeMapping[type] || ReportType.CUSTOM_REPORT;
+        
+        // Validate format is valid enum value
+        if (!Object.values(ReportFormat).includes(format)) {
+          MySwal.showValidationMessage(`Invalid format: ${format}. Must be one of: ${Object.values(ReportFormat).join(', ')}`);
+          return false;
+        }
+
+        return {
+          reportType: reportType,
+          format: format,  // Now using proper enum value
+          startDate: startDate,
+          endDate: endDate,
+          includeCharts: true
+        };
+      },
     });
 
     if (formValues) {
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log('Sending report request:', formValues);
+        const response = await feeApi.post('/reports/generate', formValues);
+        const report = handleResponse(response);
+        
         showSuccessAlert(
           'Report Generated!',
-          `Your ${type} report has been generated successfully.`
+          `Your ${type} report has been generated successfully. You can download it from the reports section.`
         );
       } catch (error) {
-        showErrorAlert('Generation Failed', 'There was an error generating the report.');
+        console.error('Report generation error:', error);
+        handleError(error);
+        showErrorAlert('Generation Failed', 'There was an error generating the report. Please check the format and try again.');
       } finally {
         setIsLoading(false);
       }
@@ -1577,53 +1706,79 @@ School Accounts Department`}
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
       const matchesSearch = searchQuery === '' || 
-        [student.name, student.guardian, student.class, student.email, student.contact]
-          .some(field => field.toLowerCase().includes(searchQuery.toLowerCase()));
+        [student.studentName, student.guardianName, student.grade, student.email, student.contact]
+          .some(field => field?.toLowerCase().includes(searchQuery.toLowerCase()));
       
-      const matchesClass = selectedClass === 'All' || student.class === selectedClass;
+      const matchesClass = selectedClass === 'All' || student.grade === selectedClass;
       
-      const matchesStatus = filterStatus === 'all' || student.status === filterStatus;
+      const matchesStatus = filterStatus === 'all' || student.feeStatus === filterStatus.toUpperCase();
       
       return matchesSearch && matchesClass && matchesStatus;
     });
   }, [searchQuery, selectedClass, filterStatus, students]);
 
-  // Statistics
+  // Statistics from API data
   const stats = useMemo(() => {
-    const totalCollected = students.reduce((sum, student) => sum + student.paid, 0);
-    const totalPending = students.reduce((sum, student) => sum + student.pending, 0);
-    const totalFee = students.reduce((sum, student) => sum + student.totalFee, 0);
-    const paidCount = students.filter(s => s.status === 'paid').length;
-    const overdueCount = students.filter(s => s.status === 'overdue').length;
-    const partialCount = students.filter(s => s.status === 'partial').length;
-    const remindersSent = students.reduce((sum, s) => sum + s.remindersSent, 0);
-    
-    // Students with multiple payments
-    const studentsWithMultiplePayments = students.filter(student => {
-      const studentTransactions = transactions.filter(t => t.studentId === student.id);
-      return studentTransactions.length > 1;
-    }).length;
-    
-    // Average payments per student
-    const avgPaymentsPerStudent = students.length > 0 
-      ? (transactions.length / students.length).toFixed(1)
-      : '0';
-    
+    if (!dashboardStats) {
+      return {
+        totalCollected: '₹0',
+        totalPending: '₹0',
+        totalFee: '₹0',
+        collectionRate: '0%',
+        paidCount: 0,
+        overdueCount: 0,
+        partialCount: 0,
+        collectionTrend: '+0%',
+        pendingTrend: '-0%',
+        remindersSent: 0,
+        multiplePayments: 0,
+        avgPayments: '0'
+      };
+    }
+
     return {
-      totalCollected: `₹${(totalCollected / 1000000).toFixed(2)}M`,
-      totalPending: `₹${(totalPending / 1000).toFixed(0)}K`,
-      totalFee: `₹${(totalFee / 1000000).toFixed(2)}M`,
-      collectionRate: `${totalFee > 0 ? ((totalCollected / totalFee) * 100).toFixed(1) : '0'}%`,
-      paidCount,
-      overdueCount,
-      partialCount,
-      collectionTrend: '+12.5%',
-      pendingTrend: '-8.2%',
-      remindersSent,
-      multiplePayments: studentsWithMultiplePayments,
-      avgPayments: avgPaymentsPerStudent
+      totalCollected: `₹${(dashboardStats.totalCollected || 0).toLocaleString('en-IN')}`,
+      totalPending: `₹${(dashboardStats.totalPending || 0).toLocaleString('en-IN')}`,
+      totalFee: `₹${(dashboardStats.totalFee || 0).toLocaleString('en-IN')}`,
+      collectionRate: `${dashboardStats.collectionRate?.toFixed(1) || '0'}%`,
+      paidCount: dashboardStats.paidStudents || 0,
+      overdueCount: dashboardStats.overdueStudents || 0,
+      partialCount: dashboardStats.partialPaidStudents || 0,
+      collectionTrend: dashboardStats.targetAchievementRate ? `+${dashboardStats.targetAchievementRate.toFixed(1)}%` : '+0%',
+      pendingTrend: dashboardStats.remainingTarget ? `-${((dashboardStats.remainingTarget / (dashboardStats.totalPending || 1)) * 100).toFixed(1)}%` : '-0%',
+      remindersSent: dashboardStats.remindersSentToday || 0,
+      multiplePayments: dashboardStats.multiplePaymentStudents || 0,
+      avgPayments: dashboardStats.averagePaymentsPerStudent?.toFixed(1) || '0'
     };
-  }, [students, transactions]);
+  }, [dashboardStats]);
+
+  // Chart data from API
+  const collectionTrendData = useMemo(() => {
+    return collectionTrend.map(point => ({
+      month: new Date(point.date).toLocaleDateString('en-US', { month: 'short' }),
+      collected: point.collectedAmount || 0,
+      target: point.targetAmount || 0,
+      overdue: point.overdueAmount || 0
+    }));
+  }, [collectionTrend]);
+
+  const paymentMethodsData = useMemo(() => {
+    return paymentMethods.map(method => ({
+      name: method.displayName,
+      value: method.percentage || 0,
+      color: method.color || '#6b7280',
+      transactions: method.transactionCount || 0,
+      amount: method.totalAmount || 0
+    }));
+  }, [paymentMethods]);
+
+  const overdueDistributionData = useMemo(() => {
+    return overdueDistribution.map(range => ({
+      range: range.range,
+      count: range.studentCount || 0,
+      amount: range.totalAmount || 0
+    }));
+  }, [overdueDistribution]);
 
   // Quick actions
   const quickActions = [
@@ -1637,19 +1792,19 @@ School Accounts Department`}
       icon: FileText, 
       label: 'Generate Report', 
       color: 'bg-gradient-to-br from-emerald-500 to-emerald-600',
-      action: () => handleGenerateReport('Monthly Collection')
+      action: () => handleGenerateReport('Monthly Collection Summary')
     },
     { 
-      icon: Printer, 
-      label: 'Print Receipts', 
+      icon: RefreshCw, 
+      label: 'Refresh Data', 
       color: 'bg-gradient-to-br from-purple-500 to-purple-600',
-      action: () => showSuccessAlert('Print Started', 'Receipts are being sent to printer.') 
+      action: handleRefresh 
     },
     { 
       icon: Download, 
       label: 'Export Excel', 
       color: 'bg-gradient-to-br from-amber-500 to-amber-600',
-      action: () => handleExportData('excel')
+      action: () => handleExportData('EXCEL')
     },
     {
       icon: ArrowRight,
@@ -1673,7 +1828,21 @@ School Accounts Department`}
     if (selectedStudents.length === filteredStudents.length) {
       setSelectedStudents([]);
     } else {
-      setSelectedStudents(filteredStudents.map(s => s.id));
+      setSelectedStudents(filteredStudents.map(s => s.studentId));
+    }
+  };
+
+  // Handle period change for trend chart
+  const handleTrendPeriodChange = async (period) => {
+    setSelectedTerm(period);
+    setTrendLoading(true);
+    try {
+      await loadCollectionTrend(period);
+    } catch (error) {
+      console.error('Error changing trend period:', error);
+      handleError(error);
+    } finally {
+      setTrendLoading(false);
     }
   };
 
@@ -1718,7 +1887,7 @@ School Accounts Department`}
           
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
-              onClick={() => setIsLoading(!isLoading)}
+              onClick={handleRefresh}
               disabled={isLoading}
               className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 px-4 py-3 rounded-xl border border-gray-200 shadow-sm disabled:opacity-50 transition-all"
             >
@@ -1735,7 +1904,7 @@ School Accounts Department`}
         </div>
       </motion.header>
 
-      {/* Quick Stats - Enhanced */}
+      {/* Quick Stats - From API */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1744,35 +1913,39 @@ School Accounts Department`}
       >
         <StatCard
           label="Total Collected"
-          value={stats.totalCollected}
+          value={statsLoading ? '...' : stats.totalCollected}
           icon={DollarSign}
           color="bg-gradient-to-br from-blue-500 to-blue-600"
-          trend="+12.5%"
-          change={12.5}
+          trend={stats.collectionTrend}
+          change={parseFloat(stats.collectionTrend)}
+          isLoading={statsLoading}
         />
         <StatCard
           label="Collection Rate"
-          value={stats.collectionRate}
+          value={statsLoading ? '...' : stats.collectionRate}
           icon={Percent}
           color="bg-gradient-to-br from-emerald-500 to-emerald-600"
           trend="+2.3%"
           change={2.3}
+          isLoading={statsLoading}
         />
         <StatCard
           label="Paid Students"
-          value={`${stats.paidCount}/${students.length}`}
+          value={statsLoading ? '...' : `${stats.paidCount}/${students.length}`}
           icon={UserCheck}
           color="bg-gradient-to-br from-green-500 to-green-600"
-          trend="94%"
-          change={94}
+          trend={students.length > 0 ? `${(stats.paidCount/students.length * 100).toFixed(0)}%` : '0%'}
+          change={students.length > 0 ? (stats.paidCount/students.length * 100) : 0}
+          isLoading={statsLoading || studentsLoading}
         />
         <StatCard
-          label="Students with Multiple Payments"
-          value={`${stats.multiplePayments}/${students.length}`}
+          label="Multiple Payments"
+          value={statsLoading ? '...' : `${stats.multiplePayments}/${students.length}`}
           icon={Layers}
           color="bg-gradient-to-br from-purple-500 to-purple-600"
           trend="+5.2%"
           change={5.2}
+          isLoading={statsLoading || studentsLoading}
         />
       </motion.div>
 
@@ -1783,8 +1956,10 @@ School Accounts Department`}
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
+          className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative"
         >
+          <LoadingOverlay isLoading={trendLoading} message="Loading trend data..." />
+          
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Collection Trend & Targets</h2>
@@ -1793,84 +1968,92 @@ School Accounts Department`}
             <div className="flex items-center gap-3">
               <select
                 value={selectedTerm}
-                onChange={(e) => setSelectedTerm(e.target.value)}
+                onChange={(e) => handleTrendPeriodChange(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={trendLoading}
               >
-                <option>Last 6 Months</option>
-                <option>Quarterly View</option>
-                <option>Year-to-Date</option>
-                <option>Full Year</option>
+                <option value="MONTHLY">Last 6 Months</option>
+                <option value="QUARTERLY">Quarterly View</option>
+                <option value="DAILY">Daily View</option>
+                <option value="WEEKLY">Weekly View</option>
               </select>
-              <button className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 px-3 py-2 hover:bg-blue-50 rounded-lg">
-                <BarChart2 className="w-4 h-4" />
-                Compare
-              </button>
             </div>
           </div>
           
-          <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={collectionTrendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis 
-                dataKey="month" 
-                stroke="#6b7280" 
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis 
-                stroke="#6b7280" 
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(value) => `₹${(value/1000000).toFixed(0)}M`}
-              />
-              <Tooltip 
-                formatter={(value) => [`₹${(value/1000000).toFixed(2)}M`, 'Amount']}
-                labelStyle={{ color: '#374151', fontWeight: 600 }}
-                contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }}
-              />
-              <Legend />
-              <Area 
-                type="monotone" 
-                dataKey="collected" 
-                name="Collected Amount"
-                stroke="#3b82f6" 
-                fill="url(#colorCollected)" 
-                strokeWidth={3}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="target" 
-                name="Target Amount"
-                stroke="#10b981" 
-                fill="url(#colorTarget)" 
-                strokeWidth={2}
-                strokeDasharray="5 5"
-              />
-              <Area 
-                type="monotone" 
-                dataKey="overdue" 
-                name="Overdue Amount"
-                stroke="#ef4444" 
-                fill="url(#colorOverdue)" 
-                strokeWidth={2}
-                opacity={0.6}
-              />
-              <defs>
-                <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                </linearGradient>
-                <linearGradient id="colorTarget" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
-                </linearGradient>
-                <linearGradient id="colorOverdue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.6}/>
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
-                </linearGradient>
-              </defs>
-            </AreaChart>
-          </ResponsiveContainer>
+          {!trendLoading && collectionTrendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <AreaChart data={collectionTrendData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis 
+                  dataKey="month" 
+                  stroke="#6b7280" 
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis 
+                  stroke="#6b7280" 
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value) => `₹${(value/1000000).toFixed(0)}M`}
+                />
+                <Tooltip 
+                  formatter={(value) => [`₹${(value/1000000).toFixed(2)}M`, 'Amount']}
+                  labelStyle={{ color: '#374151', fontWeight: 600 }}
+                  contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }}
+                />
+                <Legend />
+                <Area 
+                  type="monotone" 
+                  dataKey="collected" 
+                  name="Collected Amount"
+                  stroke="#3b82f6" 
+                  fill="url(#colorCollected)" 
+                  strokeWidth={3}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="target" 
+                  name="Target Amount"
+                  stroke="#10b981" 
+                  fill="url(#colorTarget)" 
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="overdue" 
+                  name="Overdue Amount"
+                  stroke="#ef4444" 
+                  fill="url(#colorOverdue)" 
+                  strokeWidth={2}
+                  opacity={0.6}
+                />
+                <defs>
+                  <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="colorTarget" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="colorOverdue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.6}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            !trendLoading && (
+              <div className="flex items-center justify-center h-80">
+                <div className="text-center">
+                  <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500">No trend data available</p>
+                </div>
+              </div>
+            )
+          )}
         </motion.div>
 
         {/* Payment Methods & Overdue Distribution */}
@@ -1881,64 +2064,90 @@ School Accounts Department`}
           className="space-y-6"
         >
           {/* Payment Methods */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative">
+            <LoadingOverlay isLoading={paymentMethodsLoading} message="Loading payment methods..." />
+            
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Payment Methods</h2>
               <PieChartIcon className="w-5 h-5 text-gray-400" />
             </div>
             
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={paymentMethodsData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                >
-                  {paymentMethodsData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  formatter={(value, name, props) => [
-                    `${value}% (${props.payload.transactions} transactions)`,
-                    name
-                  ]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            {!paymentMethodsLoading && paymentMethodsData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={paymentMethodsData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={70}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {paymentMethodsData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value, name, props) => [
+                      `${value}% (${props.payload.transactions} transactions)`,
+                      name
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              !paymentMethodsLoading && (
+                <div className="flex items-center justify-center h-48">
+                  <div className="text-center">
+                    <PieChartIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500">No payment method data</p>
+                  </div>
+                </div>
+              )
+            )}
           </div>
 
           {/* Overdue Distribution */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative">
+            <LoadingOverlay isLoading={overdueLoading} message="Loading overdue data..." />
+            
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-gray-900">Overdue Distribution</h2>
               <AlertTriangle className="w-5 h-5 text-rose-400" />
             </div>
             
-            <div className="space-y-4">
-              {overdueDistributionData.map((item, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">{item.range}</span>
-                    <span className="text-gray-600">{item.count} students</span>
+            {!overdueLoading && overdueDistributionData.length > 0 ? (
+              <div className="space-y-4">
+                {overdueDistributionData.map((item, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">{item.range}</span>
+                      <span className="text-gray-600">{item.count} students</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-rose-500 h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${(item.count / Math.max(...overdueDistributionData.map(d => d.count || 1)) * 100)}%` 
+                        }}
+                      />
+                    </div>
+                    <div className="text-right text-sm text-rose-600 font-medium">
+                      ₹{item.amount?.toLocaleString('en-IN') || '0'}
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-rose-500 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${(item.count / Math.max(...overdueDistributionData.map(d => d.count))) * 100}%` }}
-                    />
-                  </div>
-                  <div className="text-right text-sm text-rose-600 font-medium">
-                    ₹{item.amount.toLocaleString()}
-                  </div>
+                ))}
+              </div>
+            ) : (
+              !overdueLoading && (
+                <div className="text-center py-8">
+                  <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500">No overdue data available</p>
                 </div>
-              ))}
-            </div>
+              )
+            )}
           </div>
         </motion.div>
       </div>
@@ -1948,8 +2157,10 @@ School Accounts Department`}
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6"
+        className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6 relative"
       >
+        <LoadingOverlay isLoading={recentPaymentsLoading} message="Loading recent payments..." />
+        
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Recent Payments</h2>
@@ -1964,53 +2175,68 @@ School Accounts Department`}
           </Link>
         </div>
 
-        <div className="space-y-3">
-          {recentPayments.map((payment) => (
-            <motion.div
-              key={payment.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              whileHover={{ x: 5 }}
-              className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 hover:border-blue-200 transition-all cursor-pointer"
-              onClick={() => navigate(`/accountant/transactions`)}
-            >
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded-lg ${
-                  payment.method === 'online' ? 'bg-blue-100' :
-                  payment.method === 'card' ? 'bg-emerald-100' :
-                  payment.method === 'upi' ? 'bg-purple-100' :
-                  payment.method === 'cash' ? 'bg-amber-100' : 'bg-gray-100'
-                }`}>
-                  {payment.method === 'online' ? <CreditCard className="w-5 h-5 text-blue-600" /> :
-                   payment.method === 'card' ? <Card className="w-5 h-5 text-emerald-600" /> :
-                   payment.method === 'upi' ? <QrCode className="w-5 h-5 text-purple-600" /> :
-                   payment.method === 'cash' ? <Banknote className="w-5 h-5 text-amber-600" /> :
-                   <FileText className="w-5 h-5 text-gray-600" />}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900">{payment.studentName}</p>
-                    {payment.installmentNumber && (
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                        Installment {payment.installmentNumber}
-                      </span>
-                    )}
+        {!recentPaymentsLoading && recentPayments.length > 0 ? (
+          <div className="space-y-3">
+            {recentPayments.map((payment) => (
+              <motion.div
+                key={payment.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                whileHover={{ x: 5 }}
+                className="flex items-center justify-between p-4 border border-gray-100 rounded-xl hover:bg-gray-50 hover:border-blue-200 transition-all cursor-pointer"
+                onClick={() => navigate(`/accountant/transactions`)}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-lg ${
+                    payment.paymentMethod === 'ONLINE_BANKING' ? 'bg-blue-100' :
+                    payment.paymentMethod === 'CREDIT_CARD' || payment.paymentMethod === 'DEBIT_CARD' ? 'bg-emerald-100' :
+                    payment.paymentMethod === 'UPI' ? 'bg-purple-100' :
+                    payment.paymentMethod === 'CASH' ? 'bg-amber-100' : 'bg-gray-100'
+                  }`}>
+                    {payment.paymentMethod === 'ONLINE_BANKING' ? <CreditCard className="w-5 h-5 text-blue-600" /> :
+                     payment.paymentMethod === 'CREDIT_CARD' || payment.paymentMethod === 'DEBIT_CARD' ? <Card className="w-5 h-5 text-emerald-600" /> :
+                     payment.paymentMethod === 'UPI' ? <QrCode className="w-5 h-5 text-purple-600" /> :
+                     payment.paymentMethod === 'CASH' ? <Banknote className="w-5 h-5 text-amber-600" /> :
+                     <FileText className="w-5 h-5 text-gray-600" />}
                   </div>
-                  <p className="text-sm text-gray-600">{payment.class} • {payment.date}</p>
-                  <p className="text-xs text-gray-500">{payment.receipt}</p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{payment.studentName}</p>
+                      {payment.installmentNumber && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                          Installment {payment.installmentNumber}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600">{payment.studentGrade} • {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}</p>
+                    <p className="text-xs text-gray-500">{payment.receiptNumber}</p>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <p className="font-bold text-lg text-gray-900">₹{payment.amount.toLocaleString()}</p>
-                  <PaymentMethodBadge method={payment.method} />
+                
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="font-bold text-lg text-gray-900">₹{payment.amount?.toLocaleString('en-IN') || '0'}</p>
+                    <PaymentMethodBadge method={payment.paymentMethod} />
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          !recentPaymentsLoading && (
+            <div className="text-center py-12">
+              <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">No recent payments found</p>
+            </div>
+          )
+        )}
       </motion.div>
 
       {/* Quick Actions */}
@@ -2033,8 +2259,13 @@ School Accounts Department`}
               transition={{ delay: 0.1 * index }}
               onClick={action.action}
               disabled={isLoading}
-              className="group bg-white p-5 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-left"
+              className="group bg-white p-5 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-left relative"
             >
+              {isLoading && (
+                <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-2xl">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              )}
               <div className={`${action.color} p-3 rounded-xl w-fit mb-4 group-hover:scale-110 transition-transform`}>
                 <action.icon className="w-5 h-5 text-white" />
               </div>
@@ -2050,8 +2281,10 @@ School Accounts Department`}
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+        className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden relative"
       >
+        <LoadingOverlay isLoading={studentsLoading} message="Loading student data..." />
+        
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
             <div>
@@ -2079,6 +2312,7 @@ School Accounts Department`}
                     className="pl-10 pr-4 py-2.5 w-full border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-gray-50"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    disabled={studentsLoading}
                   />
                 </div>
                 
@@ -2088,9 +2322,10 @@ School Accounts Department`}
                     className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     value={selectedClass}
                     onChange={(e) => setSelectedClass(e.target.value)}
+                    disabled={studentsLoading}
                   >
                     <option value="All">All Classes</option>
-                    {[...new Set(students.map(s => s.class))].map(cls => (
+                    {[...new Set(students.map(s => s.grade))].map(cls => (
                       <option key={cls} value={cls}>{cls}</option>
                     ))}
                   </select>
@@ -2099,12 +2334,12 @@ School Accounts Department`}
                     className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
+                    disabled={studentsLoading}
                   >
                     <option value="all">All Status</option>
-                    <option value="paid">Paid</option>
-                    <option value="pending">Pending</option>
-                    <option value="overdue">Overdue</option>
-                    <option value="partial">Partial</option>
+                    <option value="PAID">Paid</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="OVERDUE">Overdue</option>
                   </select>
                 </div>
               </div>
@@ -2128,9 +2363,9 @@ School Accounts Department`}
                   </div>
                   <span className="text-sm text-blue-700">
                     Total pending: ₹{students
-                      .filter(s => selectedStudents.includes(s.id))
-                      .reduce((sum, s) => sum + s.pending, 0)
-                      .toLocaleString()}
+                      .filter(s => selectedStudents.includes(s.studentId))
+                      .reduce((sum, s) => sum + (s.pendingAmount || 0), 0)
+                      .toLocaleString('en-IN')}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -2154,188 +2389,222 @@ School Accounts Department`}
 
         {/* Student List with Complete Payment History */}
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
-                      onChange={toggleSelectAll}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Student</span>
-                  </div>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Fee Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Amount Details
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredStudents.map((student) => {
-                const studentTransactions = transactions.filter(t => t.studentId === student.id);
-                const totalPaid = studentTransactions.reduce((sum, t) => sum + t.amount, 0);
-                
-                return (
-                  <motion.tr
-                    key={student.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedStudents.includes(student.id)}
-                          onChange={() => toggleStudentSelection(student.id)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-gray-900">{student.name}</p>
-                            {student.remindersSent > 0 && (
-                              <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                                {student.remindersSent} reminder{student.remindersSent > 1 ? 's' : ''}
-                              </span>
+          {!studentsLoading && filteredStudents.length > 0 ? (
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                        onChange={toggleSelectAll}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        disabled={studentsLoading}
+                      />
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Student</span>
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Fee Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Amount Details
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredStudents.map((student) => {
+                  // Calculate payment percentage on frontend
+                  const paymentPercentage = calculatePaymentPercentage(student.totalFee, student.paidAmount);
+                  const isRecentPaymentsLoading = loadingStudentPayments[student.studentId];
+                  
+                  return (
+                    <motion.tr
+                      key={student.studentId}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedStudents.includes(student.studentId)}
+                            onChange={() => toggleStudentSelection(student.studentId)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            disabled={studentsLoading}
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-900">{student.studentName}</p>
+                              {student.remindersSent > 0 && (
+                                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                                  {student.remindersSent} reminder{student.remindersSent > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {student.paymentCount > 0 && (
+                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                                  {student.paymentCount} payment{student.paymentCount > 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600">{student.grade} • {student.guardianName}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Phone className="w-3 h-3 text-gray-400" />
+                              <span className="text-xs text-gray-500">{student.contact}</span>
+                              <Mail className="w-3 h-3 text-gray-400 ml-2" />
+                              <span className="text-xs text-gray-500">{student.email}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-2">
+                          <FeeStatusBadge status={student.feeStatus} />
+                          <div className="text-xs space-y-1">
+                            <p className="text-gray-500">Due: {student.dueDate || 'N/A'}</p>
+                            {student.lastPaymentDate && (
+                              <p className="text-emerald-600">Last payment: {new Date(student.lastPaymentDate).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}</p>
                             )}
-                            {studentTransactions.length > 0 && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                                {studentTransactions.length} payment{studentTransactions.length > 1 ? 's' : ''}
-                              </span>
+                            {student.lastReminderDate && (
+                              <p className="text-amber-600">Last reminder: {new Date(student.lastReminderDate).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}</p>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600">{student.class} • {student.guardian}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Phone className="w-3 h-3 text-gray-400" />
-                            <span className="text-xs text-gray-500">{student.contact}</span>
-                            <Mail className="w-3 h-3 text-gray-400 ml-2" />
-                            <span className="text-xs text-gray-500">{student.email}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Total:</span>
+                            <span className="font-semibold">₹{student.totalFee?.toLocaleString('en-IN') || '0'}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Paid:</span>
+                            <span className="font-semibold text-emerald-600">₹{student.paidAmount?.toLocaleString('en-IN') || '0'}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Pending:</span>
+                            <span className="font-semibold text-rose-600">₹{student.pendingAmount?.toLocaleString('en-IN') || '0'}</span>
+                          </div>
+                          
+                          {/* Progress Bar - Now calculated on frontend */}
+                          <div className="mt-2">
+                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                              <span>Payment Progress</span>
+                              <span className="font-medium">
+                                {paymentPercentage.toFixed(1)}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${paymentPercentage}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-2">
-                        <FeeStatusBadge status={student.status} />
-                        <div className="text-xs space-y-1">
-                          <p className="text-gray-500">Due: {student.dueDate}</p>
-                          {student.lastPayment && (
-                            <p className="text-emerald-600">Last payment: {student.lastPayment}</p>
-                          )}
-                          {student.lastReminder && (
-                            <p className="text-amber-600">Last reminder: {student.lastReminder}</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Total:</span>
-                          <span className="font-semibold">₹{student.totalFee.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Paid:</span>
-                          <span className="font-semibold text-emerald-600">₹{totalPaid.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Pending:</span>
-                          <span className="font-semibold text-rose-600">₹{student.pending.toLocaleString()}</span>
-                        </div>
-                        
-                        {/* Progress Bar */}
-                        <div className="mt-2">
-                          <div className="flex justify-between text-xs text-gray-500 mb-1">
-                            <span>Payment Progress</span>
-                            <span className="font-medium">
-                              {student.totalFee > 0 ? ((totalPaid / student.totalFee) * 100).toFixed(1) : '0'}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${(totalPaid / student.totalFee) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {/* View Recent Payments Button */}
-                        {studentTransactions.length > 0 && (
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-2">
+                          {/* View Recent Payments Button - FIXED */}
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => handleShowRecentPayments(student)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-colors text-sm font-medium"
+                            disabled={isLoading || isRecentPaymentsLoading || student.paymentCount === 0}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+                              student.paymentCount === 0 
+                                ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                : isRecentPaymentsLoading
+                                ? 'bg-indigo-50 text-indigo-500 cursor-wait'
+                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                            }`}
+                            title={
+                              student.paymentCount === 0 
+                                ? 'No payments to show' 
+                                : isRecentPaymentsLoading
+                                ? 'Loading recent payments...'
+                                : `View recent payments (${student.paymentCount} total)`
+                            }
                           >
-                            <Clock className="w-4 h-4" />
-                            {studentTransactions.length} Txns
+                            <Clock className={`w-4 h-4 ${isRecentPaymentsLoading ? 'animate-pulse' : ''}`} />
+                            {isRecentPaymentsLoading ? 'Loading...' : (
+                              student.paymentCount === 0 ? 'No Txns' : `Recent (${student.paymentCount})`
+                            )}
                           </motion.button>
-                        )}
-                        
-                        {/* Email Reminder */}
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleEmailReminder(student)}
-                          disabled={isLoading || student.status === 'paid'}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                          <Mail className="w-4 h-4" />
-                          Email ({student.remindersSent})
-                        </motion.button>
-                        
-                        {/* SMS Reminder */}
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleSMSReminder(student)}
-                          disabled={isLoading || student.status === 'paid'}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          SMS ({student.remindersSent})
-                        </motion.button>
-                        
-                        {/* View All Transactions Button */}
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleViewAllTransactions(student)}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg transition-colors text-sm font-medium"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Full History
-                        </motion.button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </tbody>
-          </table>
-          
-          {filteredStudents.length === 0 && (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
+                          
+                          {/* Email Reminder */}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleEmailReminder(student)}
+                            disabled={isLoading || student.feeStatus === 'PAID'}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                          >
+                            <Mail className="w-4 h-4" />
+                            Email ({student.remindersSent || 0})
+                          </motion.button>
+                          
+                          {/* SMS Reminder */}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleSMSReminder(student)}
+                            disabled={isLoading || student.feeStatus === 'PAID'}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            SMS ({student.remindersSent || 0})
+                          </motion.button>
+                          
+                          {/* View All Transactions Button */}
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleViewAllTransactions(student)}
+                            disabled={isLoading || student.paymentCount === 0}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${
+                              student.paymentCount === 0 
+                                ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
+                            }`}
+                          >
+                            <Eye className="w-4 h-4" />
+                            Full History
+                          </motion.button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            !studentsLoading && (
+              <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
+                  <Search className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No students found</h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {students.length === 0 
+                    ? 'No student data available. Please refresh or check your connection.' 
+                    : 'No students match your current search criteria. Try adjusting your filters or search terms.'}
+                </p>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No students found</h3>
-              <p className="text-gray-500 max-w-md mx-auto">
-                No students match your current search criteria. Try adjusting your filters or search terms.
-              </p>
-            </div>
+            )
           )}
         </div>
       </motion.div>

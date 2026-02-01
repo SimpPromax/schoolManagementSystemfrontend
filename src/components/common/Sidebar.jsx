@@ -11,7 +11,13 @@ import {
   Settings,
   LogOut,
   School,
-  X
+  X,
+  Calendar,
+  DollarSign,
+  PieChart,
+  TrendingUp,
+  Layers,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -46,6 +52,16 @@ const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Salary Processing', icon: CreditCard, path: '/accountant/salary' },
     { name: 'Expense Management', icon: BarChart3, path: '/accountant/expenses' },
     { name: 'Fee Collection', icon: Users, path: '/accountant/fees' },
+    { name: 'Transactions', icon: FileSpreadsheet, path: '/accountant/transactions' },
+  ];
+
+  // Term Allocation Sub-menu for Accountant
+  const termAllocationNav = [
+    { name: 'Term Fee Dashboard', icon: BarChart3, path: '/accountant/term-fees' },
+    { name: 'Term Management', icon: Calendar, path: '/accountant/term-fees/management' },
+    { name: 'Fee Structures', icon: FileText, path: '/accountant/term-fees/structures' },
+    { name: 'Additional Fees', icon: TrendingUp, path: '/accountant/term-fees/additional-fees' },
+    { name: 'Fee Reports', icon: PieChart, path: '/accountant/term-fees/reports' },
   ];
 
   const navItems = role === 'student' ? studentNav : role === 'teacher' ? teacherNav : accountantNav;
@@ -84,14 +100,15 @@ const Sidebar = ({ isOpen, onClose }) => {
   };
 
   const handleLogout = async () => {
-    await logout(); // All confirmation + cleanup handled in AuthContext
+    await logout();
   };
 
   const handleHomeClick = () => {
-    // Navigate to root (public home or login)
     window.location.href = '/';
     if (window.innerWidth < 1024) onClose();
   };
+
+
 
   return (
     <>
@@ -167,6 +184,36 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <span>{item.name}</span>
               </NavLink>
             ))}
+
+            {/* Term Allocation Sub-menu for Accountant (Mobile) */}
+            {role === 'accountant' && (
+              <div className="pt-4 mt-4 border-t border-gray-200/40">
+                <div className="mb-3">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4">
+                    Term Allocations
+                  </h3>
+                </div>
+                <div className="space-y-1">
+                  {termAllocationNav.map((item) => (
+                    <NavLink
+                      key={item.name}
+                      to={item.path}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                          isActive 
+                            ? 'bg-linear-to-r from-indigo-100/80 to-indigo-50/60 text-indigo-700 backdrop-blur-sm shadow-sm' 
+                            : 'text-gray-700 hover:bg-gray-100/50'
+                        }`
+                      }
+                      onClick={handleLinkClick}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span>{item.name}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            )}
           </nav>
 
           {/* Mobile Bottom Actions - Always visible */}
@@ -241,6 +288,36 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <span>{item.name}</span>
               </NavLink>
             ))}
+
+            {/* Term Allocation Sub-menu for Accountant (Desktop) */}
+            {role === 'accountant' && (
+              <div className="pt-6 mt-4 border-t border-gray-200/40">
+                <div className="mb-4">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 mb-3">
+                    Term Allocations
+                  </h3>
+                </div>
+                <div className="space-y-1.5">
+                  {termAllocationNav.map((item) => (
+                    <NavLink
+                      key={item.name}
+                      to={item.path}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                          isActive 
+                            ? 'bg-linear-to-r from-indigo-100/80 to-indigo-50/60 text-indigo-700 backdrop-blur-sm shadow-sm' 
+                            : 'text-gray-700 hover:bg-gray-100/50 hover:shadow-sm'
+                        }`
+                      }
+                      onClick={handleLinkClick}
+                    >
+                      <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <span>{item.name}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            )}
           </nav>
 
           {/* Bottom Actions */}

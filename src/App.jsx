@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -39,6 +38,12 @@ import SalaryProcessing from './components/accountant/SalaryProcessing';
 import ExpenseManagement from './components/accountant/ExpenseManagement';
 import FeeCollection from './components/accountant/FeeCollection';
 import Transactions from './components/accountant/Transactions';
+
+// Term Fee Management Components
+import TermFeeDashboard from './components/termallocation/TermFeeDashboard';
+import AdditionalFeeAllocation from './components/termallocation/AdditionalFeeAllocation';
+import TermManagement from './components/termallocation/TermManagement';
+import FeeStructureManager from './components/termallocation/FeeStructureManager';
 
 function App() {
   return (
@@ -81,6 +86,7 @@ function App() {
             <Route path="dashboard" element={<TeacherDashboard />} />
             <Route path="gradebook" element={<Gradebook />} />
             <Route path="assignments" element={<AssignmentManager />} />
+            <Route path="classes" element={<div className="p-8"><h1 className="text-3xl font-bold">My Classes</h1><p>Class management coming soon</p></div>} />
             <Route path="profile" element={<TeacherProfile />} />
             <Route path="*" element={<NotFound />} />
           </Route>
@@ -120,7 +126,7 @@ function App() {
           <Route
             path="/accountant/*"
             element={
-              <PrivateRoute allowedRoles={['ACCOUNTANT', 'STAFF']}>
+              <PrivateRoute allowedRoles={['ACCOUNTANT', 'STAFF', 'ADMIN']}>
                 <Layout />
               </PrivateRoute>
             }
@@ -131,6 +137,14 @@ function App() {
             <Route path="expenses" element={<ExpenseManagement />} />
             <Route path="fees" element={<FeeCollection />} />
             <Route path="transactions" element={<Transactions />} />
+            
+            {/* Term Fee Management Routes */}
+            <Route path="term-fees" element={<TermFeeDashboard />} />
+            <Route path="term-fees/management" element={<TermManagement />} />
+            <Route path="term-fees/structures" element={<FeeStructureManager />} />
+            <Route path="term-fees/additional-fees" element={<AdditionalFeeAllocation />} />
+
+            
             <Route path="*" element={<NotFound />} />
           </Route>
 
