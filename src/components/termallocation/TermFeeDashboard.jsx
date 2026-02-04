@@ -1,4 +1,4 @@
- /* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 import React, { useState, useMemo, useEffect, useCallback, useReducer } from 'react';
 import {
   Users, DollarSign, Percent, AlertTriangle, Clock,
@@ -1059,7 +1059,7 @@ const TermFeeDashboard = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-blue-600">
-                        ₹{year.totalCollections?.toLocaleString('en-IN') || '0'}
+                        KES {year.totalCollections?.toLocaleString('en-KE') || '0'}
                       </p>
                       <p className="text-xs text-gray-600">Total Collections</p>
                     </div>
@@ -1433,7 +1433,7 @@ const TermFeeDashboard = () => {
             <div>
               <p className="text-sm font-medium text-gray-600 mb-2">Expected Revenue</p>
               <p className="text-3xl font-bold text-gray-900">
-                ₹{state.dashboardStats.totalExpectedFee?.toLocaleString('en-IN') || '0'}
+                KES {state.dashboardStats.totalExpectedFee?.toLocaleString('en-KE') || '0'}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 From {state.gradeDashboards.length} grades
@@ -1453,7 +1453,7 @@ const TermFeeDashboard = () => {
                 {state.dashboardStats.collectionRate?.toFixed(1) || 0}%
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                ₹{state.dashboardStats.totalCollectedFee?.toLocaleString('en-IN') || '0'} collected
+                KES {state.dashboardStats.totalCollectedFee?.toLocaleString('en-KE') || '0'} collected
               </p>
             </div>
             <div className="p-4 bg-emerald-100 rounded-xl">
@@ -1467,7 +1467,7 @@ const TermFeeDashboard = () => {
             <div>
               <p className="text-sm font-medium text-gray-600 mb-2">Outstanding</p>
               <p className="text-3xl font-bold text-gray-900">
-                ₹{Math.abs(state.dashboardStats.totalOutstanding || 0)?.toLocaleString('en-IN')}
+                KES {Math.abs(state.dashboardStats.totalOutstanding || 0)?.toLocaleString('en-KE')}
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 {state.dashboardStats.totalOutstanding < 0 ? 'Overpayment' : 'Pending'}
@@ -1549,11 +1549,11 @@ const TermFeeDashboard = () => {
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div className="bg-blue-50 p-4 rounded-xl">
                       <p className="text-sm text-gray-600">Expected</p>
-                      <p className="text-xl font-bold text-blue-600">₹{gradeData.expectedRevenue?.toLocaleString('en-IN') || 0}</p>
+                      <p className="text-xl font-bold text-blue-600">KES {gradeData.expectedRevenue?.toLocaleString('en-KE') || 0}</p>
                     </div>
                     <div className="bg-green-50 p-4 rounded-xl">
                       <p className="text-sm text-gray-600">Collected</p>
-                      <p className="text-xl font-bold text-green-600">₹{gradeData.collected?.toLocaleString('en-IN') || 0}</p>
+                      <p className="text-xl font-bold text-green-600">KES {gradeData.collected?.toLocaleString('en-KE') || 0}</p>
                     </div>
                     <div className="bg-purple-50 p-4 rounded-xl">
                       <p className="text-sm text-gray-600">Rate</p>
@@ -1561,7 +1561,7 @@ const TermFeeDashboard = () => {
                     </div>
                     <div className="bg-red-50 p-4 rounded-xl">
                       <p className="text-sm text-gray-600">Outstanding</p>
-                      <p className="text-xl font-bold text-red-600">₹{Math.abs(gradeData.outstanding || 0)?.toLocaleString('en-IN')}</p>
+                      <p className="text-xl font-bold text-red-600">KES {Math.abs(gradeData.outstanding || 0)?.toLocaleString('en-KE')}</p>
                       <p className="text-xs text-gray-500">
                         {gradeData.outstanding < 0 ? 'Overpayment' : 'Pending'}
                       </p>

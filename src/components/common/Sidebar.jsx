@@ -57,11 +57,32 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   // Term Allocation Sub-menu for Accountant
   const termAllocationNav = [
-    { name: 'Term Fee Dashboard', icon: BarChart3, path: '/accountant/term-fees' },
-    { name: 'Term Management', icon: Calendar, path: '/accountant/term-fees/management' },
-    { name: 'Fee Structures', icon: FileText, path: '/accountant/term-fees/structures' },
-    { name: 'Additional Fees', icon: TrendingUp, path: '/accountant/term-fees/additional-fees' },
-    { name: 'Fee Reports', icon: PieChart, path: '/accountant/term-fees/reports' },
+    { 
+      name: 'Term Fee Dashboard', 
+      icon: BarChart3, 
+      path: '/accountant/term-fees',
+      exact: true
+    },
+    { 
+      name: 'Term Management', 
+      icon: Calendar, 
+      path: '/accountant/term-fees/management' 
+    },
+    { 
+      name: 'Fee Structures', 
+      icon: Layers, 
+      path: '/accountant/term-fees/structures' 
+    },
+    { 
+      name: 'Additional Fees', 
+      icon: TrendingUp, 
+      path: '/accountant/term-fees/additional-fees' 
+    },
+    { 
+      name: 'Fee Reports', 
+      icon: PieChart, 
+      path: '/accountant/term-fees/reports' 
+    },
   ];
 
   const navItems = role === 'student' ? studentNav : role === 'teacher' ? teacherNav : accountantNav;
@@ -107,8 +128,6 @@ const Sidebar = ({ isOpen, onClose }) => {
     window.location.href = '/';
     if (window.innerWidth < 1024) onClose();
   };
-
-
 
   return (
     <>
@@ -198,6 +217,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     <NavLink
                       key={item.name}
                       to={item.path}
+                      end={item.exact}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                           isActive 
@@ -293,15 +313,19 @@ const Sidebar = ({ isOpen, onClose }) => {
             {role === 'accountant' && (
               <div className="pt-6 mt-4 border-t border-gray-200/40">
                 <div className="mb-4">
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-4 mb-3">
-                    Term Allocations
-                  </h3>
+                  <div className="flex items-center gap-2 px-4 mb-3">
+                    <DollarSign className="w-4 h-4 text-indigo-500" />
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      Term Allocations
+                    </h3>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   {termAllocationNav.map((item) => (
                     <NavLink
                       key={item.name}
                       to={item.path}
+                      end={item.exact}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
                           isActive 

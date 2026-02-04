@@ -1,9 +1,11 @@
 import React from 'react';
 import { Bell, Search, Menu, Home } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext'; // Import the AuthContext
 
 const Header = ({ onToggleSidebar, sidebarOpen }) => {
   const location = useLocation();
+  const { user, isAuthenticated } = useAuth(); // Get user from AuthContext
 
   const getPageTitle = () => {
     const path = location.pathname;
@@ -21,8 +23,48 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
       '/accountant': 'Finance Dashboard',
       '/accountant/salary': 'Salary Processing',
       '/accountant/expenses': 'Expense Management',
+      // Add Term Fee Management routes
+      '/accountant/term-fees': 'Term Fee Dashboard',
+      '/accountant/term-fees/management': 'Term Management',
+      '/accountant/term-fees/structures': 'Fee Structures',
+      '/accountant/term-fees/additional-fees': 'Additional Fees',
+      '/accountant/term-fees/reports': 'Fee Reports',
     };
     return titles[path] || 'Springfield High School Portal';
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user || !user.fullName) return 'U';
+    
+    const nameParts = user.fullName.trim().split(' ');
+    if (nameParts.length === 1) {
+      return nameParts[0].charAt(0).toUpperCase();
+    }
+    return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
+  };
+
+  // Get user role for display
+  const getUserRole = () => {
+    if (!user || !user.role) {
+      // Determine role from path as fallback
+      const path = location.pathname;
+      if (path.includes('/student')) return 'Student';
+      if (path.includes('/teacher')) return 'Teacher';
+      if (path.includes('/accountant')) return 'Accountant';
+      return 'User';
+    }
+    
+    // Capitalize the role for display
+    return user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase();
+  };
+
+  // Get user name for display
+  const getUserName = () => {
+    if (user?.fullName) return user.fullName;
+    if (user?.username) return user.username;
+    if (user?.email) return user.email.split('@')[0];
+    return 'User';
   };
 
   return (
@@ -72,15 +114,27 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
           </button>
 
           {/* User Profile */}
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-linear-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center backdrop-blur-sm shadow-sm">
-              <span className="font-semibold text-white text-sm">JS</span>
+          {isAuthenticated && user ? (
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-linear-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center backdrop-blur-sm shadow-sm">
+                <span className="font-semibold text-white text-sm">{getUserInitials()}</span>
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-sm font-medium text-gray-900">{getUserName()}</p>
+                <p className="text-xs text-gray-500/80">{getUserRole()}</p>
+              </div>
             </div>
-            <div className="hidden sm:block">
-              <p className="text-sm font-medium text-gray-900">John Smith</p>
-              <p className="text-xs text-gray-500/80">Student</p>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-linear-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center backdrop-blur-sm shadow-sm">
+                <span className="font-semibold text-white text-sm">G</span>
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-sm font-medium text-gray-900">Guest</p>
+                <p className="text-xs text-gray-500/80">Not logged in</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </header>

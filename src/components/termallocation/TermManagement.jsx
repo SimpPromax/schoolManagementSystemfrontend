@@ -23,7 +23,7 @@ import {
   Settings,
   FileText
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -34,7 +34,6 @@ const MySwal = withReactContent(Swal);
 
 // ========== API CONFIGURATION ==========
 
-// Create fee management API instance - matching your existing pattern
 const feeApi = axios.create({
   baseURL: 'http://localhost:8080/api/v1/fee-management',
   timeout: 15000,
@@ -43,7 +42,6 @@ const feeApi = axios.create({
   }
 });
 
-// Apply interceptors matching your existing pattern
 feeApi.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -65,7 +63,6 @@ feeApi.interceptors.response.use(
   }
 );
 
-// Generic API response handler
 const handleApiResponse = (response) => {
   const responseData = response.data;
   
@@ -73,25 +70,21 @@ const handleApiResponse = (response) => {
     throw new Error('No response data received');
   }
 
-  // Check for success flag in response
   if (responseData.success === false) {
     const error = new Error(responseData.message || 'Request failed');
     error.response = response;
     throw error;
   }
 
-  // Return data field if exists, otherwise return full response
   return responseData.data || responseData;
 };
 
-// Generic API error handler
 const handleApiError = (error, context = '') => {
   console.error(`API Error in ${context}:`, error.response?.data || error.message);
 
   if (error.response) {
     const errorData = error.response.data;
     
-    // Extract message from different response formats
     let message = 'Request failed';
     
     if (typeof errorData === 'string') {
@@ -101,7 +94,6 @@ const handleApiError = (error, context = '') => {
                errorData.errorMessage || 'Server error occurred';
     }
     
-    // Status-specific handling
     switch (error.response.status) {
       case 400:
         return message || 'Bad request. Please check your input.';
@@ -125,7 +117,6 @@ const handleApiError = (error, context = '') => {
   }
 };
 
-// Unauthorized handler
 const handleUnauthorized = () => {
   localStorage.removeItem('token');
   sessionStorage.removeItem('token');
@@ -293,6 +284,48 @@ function termReducer(state, action) {
   }
 }
 
+// ========== FORM VALIDATION ==========
+
+const validateTermForm = (formData) => {
+  const errors = {};
+  
+  if (!formData.termName.trim()) {
+    errors.termName = 'Term name is required';
+  }
+  
+  if (!formData.startDate) {
+    errors.startDate = 'Start date is required';
+  }
+  
+  if (!formData.endDate) {
+    errors.endDate = 'End date is required';
+  }
+  
+  if (!formData.feeDueDate) {
+    errors.feeDueDate = 'Fee due date is required';
+  }
+  
+  if (formData.startDate && formData.endDate) {
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    
+    if (end <= start) {
+      errors.endDate = 'End date must be after start date';
+    }
+  }
+  
+  if (formData.feeDueDate && formData.endDate) {
+    const due = new Date(formData.feeDueDate);
+    const end = new Date(formData.endDate);
+    
+    if (due > end) {
+      errors.feeDueDate = 'Fee due date cannot be after term end date';
+    }
+  }
+  
+  return errors;
+};
+
 // ========== MAIN COMPONENT ==========
 
 const TermManagement = () => {
@@ -304,27 +337,14 @@ const TermManagement = () => {
     isAccountant, 
     hasRole, 
     hasAnyRole,
-    logout,
-    showAlert
+    logout
   } = useAuth();
   
   const [state, dispatch] = useReducer(termReducer, initialState);
-  const [showForm, setShowForm] = useState(false);
-  const [editingTerm, setEditingTerm] = useState(null);
-  const [formData, setFormData] = useState({
-    termName: '',
-    academicYear: `${new Date().getFullYear()}`,
-    startDate: '',
-    endDate: '',
-    feeDueDate: '',
-    isActive: true,
-    isCurrent: false
-  });
-  const [formErrors, setFormErrors] = useState({});
 
   // ========== DATA FETCHING ==========
 
-  const setLoading = useCallback((key, value) => {
+  const setLoadingState = useCallback((key, value) => {
     dispatch({ type: 'SET_LOADING', payload: { [key]: value } });
   }, []);
 
@@ -333,23 +353,18 @@ const TermManagement = () => {
   }, []);
 
   const fetchTerms = useCallback(async () => {
-    setLoading('terms', true);
+    setLoadingState('terms', true);
     try {
       const response = await feeApi.get('/terms');
       const responseData = handleApiResponse(response);
       
-      console.log('Terms API response:', responseData);
-      
       let termsArray = [];
       let currentTerm = null;
       
-      // Handle different response formats
       if (Array.isArray(responseData)) {
-        // Direct array response
         termsArray = responseData;
         currentTerm = termsArray.find(term => term.isCurrent === true);
       } else if (responseData && typeof responseData === 'object') {
-        // Object with terms array
         if (Array.isArray(responseData.terms)) {
           termsArray = responseData.terms;
           currentTerm = responseData.currentTerm || termsArray.find(term => term.isCurrent === true);
@@ -359,23 +374,13 @@ const TermManagement = () => {
         } else if (Array.isArray(responseData.content)) {
           termsArray = responseData.content;
           currentTerm = responseData.currentTerm || termsArray.find(term => term.isCurrent === true);
-        } else {
-          // Try to convert object values to array
-          const values = Object.values(responseData);
-          if (Array.isArray(values)) {
-            termsArray = values;
-            currentTerm = values.find(term => term.isCurrent === true);
-          }
         }
       }
       
-      // Ensure terms is an array
       if (!Array.isArray(termsArray)) {
-        console.warn('Terms data is not an array:', termsArray);
         termsArray = [];
       }
       
-      // Normalize term data
       termsArray = termsArray.map(term => ({
         id: term.id || term.termId,
         termName: term.termName || term.name || '',
@@ -417,9 +422,9 @@ const TermManagement = () => {
       setError('terms', errorMessage);
       console.error('Terms fetch error:', error);
     } finally {
-      setLoading('terms', false);
+      setLoadingState('terms', false);
     }
-  }, [setLoading, setError]);
+  }, [setLoadingState, setError]);
 
   const fetchAcademicYearHistory = useCallback(async () => {
     try {
@@ -428,7 +433,6 @@ const TermManagement = () => {
       
       let allTerms = [];
       
-      // Extract terms array from response
       if (Array.isArray(responseData)) {
         allTerms = responseData;
       } else if (responseData && typeof responseData === 'object') {
@@ -442,7 +446,6 @@ const TermManagement = () => {
       }
       
       if (Array.isArray(allTerms)) {
-        // Group terms by academic year
         const years = {};
         allTerms.forEach(term => {
           const academicYear = term.academicYear || 'Unknown';
@@ -484,7 +487,7 @@ const TermManagement = () => {
 
   const refreshAllData = useCallback(async () => {
     dispatch({ type: 'RESET_ERRORS' });
-    setLoading('refreshing', true);
+    setLoadingState('refreshing', true);
     
     try {
       await fetchTerms();
@@ -498,9 +501,9 @@ const TermManagement = () => {
       showErrorAlert('Refresh Failed', 'Failed to refresh term data');
       return false;
     } finally {
-      setLoading('refreshing', false);
+      setLoadingState('refreshing', false);
     }
-  }, [fetchTerms, setLoading]);
+  }, [fetchTerms, setLoadingState]);
 
   // ========== INITIAL LOAD ==========
 
@@ -521,99 +524,208 @@ const TermManagement = () => {
     loadInitialData();
   }, [isAuthenticated, navigate, fetchTerms]);
 
-  // ========== FORM HANDLING ==========
+  // ========== SWEETALERT2 FORM HANDLING ==========
 
-  const validateForm = () => {
-    const errors = {};
-    
-    if (!formData.termName.trim()) {
-      errors.termName = 'Term name is required';
-    }
-    
-    if (!formData.startDate) {
-      errors.startDate = 'Start date is required';
-    }
-    
-    if (!formData.endDate) {
-      errors.endDate = 'End date is required';
-    }
-    
-    if (!formData.feeDueDate) {
-      errors.feeDueDate = 'Fee due date is required';
-    }
-    
-    if (formData.startDate && formData.endDate) {
-      const start = new Date(formData.startDate);
-      const end = new Date(formData.endDate);
-      
-      if (end <= start) {
-        errors.endDate = 'End date must be after start date';
+  const showTermForm = (term = null) => {
+    const isEdit = !!term;
+    const defaultFormData = {
+      termName: term?.termName || '',
+      academicYear: term?.academicYear || `${new Date().getFullYear()}`,
+      startDate: term?.startDate?.split('T')[0] || '',
+      endDate: term?.endDate?.split('T')[0] || '',
+      feeDueDate: term?.feeDueDate?.split('T')[0] || '',
+      isActive: term?.isActive !== false,
+      isCurrent: term?.isCurrent || false
+    };
+
+    MySwal.fire({
+      title: <span className="text-gray-900">{isEdit ? 'Edit Term' : 'Create New Term'}</span>,
+      html: (
+        <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+          {/* Term Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Term Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="termName"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200"
+              defaultValue={defaultFormData.termName}
+              placeholder="e.g., Term 1 2026"
+            />
+          </div>
+
+          {/* Academic Year */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Academic Year <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="academicYear"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200 bg-white"
+              defaultValue={defaultFormData.academicYear}
+            >
+              <option value="">Select Year</option>
+              {Array.from({length: 5}, (_, i) => new Date().getFullYear() + i).map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Dates Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Start Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                id="startDate"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200"
+                defaultValue={defaultFormData.startDate}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                End Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                id="endDate"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200"
+                defaultValue={defaultFormData.endDate}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Fee Due Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                id="feeDueDate"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200"
+                defaultValue={defaultFormData.feeDueDate}
+              />
+            </div>
+          </div>
+
+          {/* Checkboxes */}
+          <div className="space-y-4">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  className="sr-only"
+                  defaultChecked={defaultFormData.isActive}
+                />
+                <div className={`w-12 h-6 rounded-full transition-all duration-200 ${
+                  defaultFormData.isActive ? 'bg-indigo-600' : 'bg-gray-300'
+                }`}>
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
+                    defaultFormData.isActive ? 'left-7' : 'left-1'
+                  }`}></div>
+                </div>
+              </div>
+              <span className="text-sm font-medium text-gray-700">Active Term</span>
+            </label>
+            
+            {!isEdit && (
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    id="isCurrent"
+                    className="sr-only"
+                    defaultChecked={defaultFormData.isCurrent}
+                  />
+                  <div className={`w-12 h-6 rounded-full transition-all duration-200 ${
+                    defaultFormData.isCurrent ? 'bg-green-600' : 'bg-gray-300'
+                  }`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
+                      defaultFormData.isCurrent ? 'left-7' : 'left-1'
+                    }`}></div>
+                  </div>
+                </div>
+                <span className="text-sm font-medium text-gray-700">Set as Current Term</span>
+              </label>
+            )}
+          </div>
+        </div>
+      ),
+      showCancelButton: true,
+      confirmButtonText: isEdit ? 'Update Term' : 'Create Term',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#6b7280',
+      width: 600,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl',
+        title: 'text-lg font-bold mb-4',
+        confirmButton: 'px-4 py-2.5 rounded-lg font-medium',
+        cancelButton: 'px-4 py-2.5 rounded-lg font-medium',
+        htmlContainer: 'overflow-visible'
+      },
+      preConfirm: () => {
+        const formData = {
+          termName: document.getElementById('termName').value,
+          academicYear: document.getElementById('academicYear').value,
+          startDate: document.getElementById('startDate').value,
+          endDate: document.getElementById('endDate').value,
+          feeDueDate: document.getElementById('feeDueDate').value,
+          isActive: document.getElementById('isActive').checked,
+          isCurrent: document.getElementById('isCurrent')?.checked || false
+        };
+
+        const errors = validateTermForm(formData);
+        
+        if (Object.keys(errors).length > 0) {
+          const errorMessages = Object.values(errors).join('<br>');
+          MySwal.showValidationMessage(`Please fix the following errors:<br>${errorMessages}`);
+          return false;
+        }
+
+        return formData;
       }
-    }
-    
-    if (formData.feeDueDate && formData.endDate) {
-      const due = new Date(formData.feeDueDate);
-      const end = new Date(formData.endDate);
-      
-      if (due > end) {
-        errors.feeDueDate = 'Fee due date cannot be after term end date';
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        await handleSaveTerm(result.value, term?.id);
       }
-    }
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
+    });
   };
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value,
+  // ========== ACTION HANDLERS ==========
+
+  const handleSaveTerm = async (formData, termId = null) => {
+    setLoadingState('savingTerm', true);
+    
+    MySwal.fire({
+      title: termId ? 'Updating Term...' : 'Creating Term...',
+      text: 'Please wait while we save your changes.',
+      icon: 'info',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl'
+      },
+      didOpen: () => {
+        MySwal.showLoading();
+      }
     });
     
-    // Clear error for this field
-    if (formErrors[name]) {
-      setFormErrors({
-        ...formErrors,
-        [name]: ''
-      });
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    setLoading('savingTerm', true);
-    
     try {
-      if (editingTerm) {
-        const response = await feeApi.put(`/terms/${editingTerm.id}`, formData);
+      if (termId) {
+        const response = await feeApi.put(`/terms/${termId}`, formData);
         handleApiResponse(response);
-        
         showSuccessAlert('Term Updated', 'Term has been updated successfully!');
       } else {
         const response = await feeApi.post('/terms', formData);
         handleApiResponse(response);
-        
         showSuccessAlert('Term Created', 'Term has been created successfully!');
       }
-      
-      setShowForm(false);
-      setEditingTerm(null);
-      setFormData({
-        termName: '',
-        academicYear: `${new Date().getFullYear()}`,
-        startDate: '',
-        endDate: '',
-        feeDueDate: '',
-        isActive: true,
-        isCurrent: false
-      });
-      setFormErrors({});
       
       await fetchTerms();
       
@@ -622,23 +734,8 @@ const TermManagement = () => {
       showErrorAlert('Save Failed', errorMessage);
       console.error('Save term error:', error);
     } finally {
-      setLoading('savingTerm', false);
+      setLoadingState('savingTerm', false);
     }
-  };
-
-  const handleEdit = (term) => {
-    setEditingTerm(term);
-    setFormData({
-      termName: term.termName,
-      academicYear: term.academicYear,
-      startDate: term.startDate?.split('T')[0] || '',
-      endDate: term.endDate?.split('T')[0] || '',
-      feeDueDate: term.feeDueDate?.split('T')[0] || '',
-      isActive: term.isActive,
-      isCurrent: term.isCurrent
-    });
-    setShowForm(true);
-    setFormErrors({});
   };
 
   const handleDelete = async (termId) => {
@@ -659,21 +756,37 @@ const TermManagement = () => {
 
     if (!result.isConfirmed) return;
 
-    setLoading('deletingTerm', true);
+    setLoadingState('deletingTerm', true);
+    
+    MySwal.fire({
+      title: 'Deleting Term...',
+      text: 'Please wait while we delete the term.',
+      icon: 'info',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl'
+      },
+      didOpen: () => {
+        MySwal.showLoading();
+      }
+    });
     
     try {
       const response = await feeApi.delete(`/terms/${termId}`);
       handleApiResponse(response);
       
+      MySwal.close();
       showSuccessAlert('Term Deleted', 'Term has been deleted successfully.');
       await fetchTerms();
       
     } catch (error) {
+      MySwal.close();
       const errorMessage = handleApiError(error, 'deleting term');
       showErrorAlert('Delete Failed', errorMessage);
       console.error('Delete term error:', error);
     } finally {
-      setLoading('deletingTerm', false);
+      setLoadingState('deletingTerm', false);
     }
   };
 
@@ -695,19 +808,33 @@ const TermManagement = () => {
 
     if (!result.isConfirmed) return;
 
-    setLoading('settingCurrent', true);
+    setLoadingState('settingCurrent', true);
+    
+    MySwal.fire({
+      title: 'Setting Current Term...',
+      text: 'Please wait while we update the current term.',
+      icon: 'info',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl'
+      },
+      didOpen: () => {
+        MySwal.showLoading();
+      }
+    });
     
     try {
       const response = await feeApi.post(`/terms/${termId}/set-current`);
       const updatedTerm = handleApiResponse(response);
       
-      // Update current term
+      MySwal.close();
+      
       dispatch({
         type: 'SET_CURRENT_TERM',
         payload: { ...updatedTerm, isCurrent: true }
       });
       
-      // Update terms list
       const updatedTerms = state.terms.map(term => ({
         ...term,
         isCurrent: term.id === termId
@@ -724,14 +851,13 @@ const TermManagement = () => {
       );
       
     } catch (error) {
+      MySwal.close();
       const errorMessage = handleApiError(error, 'setting current term');
       
-      // Handle conflict (term already current)
       if (error.response?.status === 409 || 
           errorMessage.includes('already') ||
           errorMessage.includes('current')) {
         
-        // Show info alert with consistent styling
         MySwal.fire({
           title: <span className="text-amber-600">Term Already Current</span>,
           html: <p className="text-gray-700">This term is already set as the current term.</p>,
@@ -770,7 +896,7 @@ const TermManagement = () => {
       }
       
     } finally {
-      setLoading('settingCurrent', false);
+      setLoadingState('settingCurrent', false);
     }
   };
 
@@ -880,24 +1006,21 @@ const TermManagement = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setEditingTerm(null);
-                  setShowForm(true);
-                  setFormData({
-                    termName: '',
-                    academicYear: `${new Date().getFullYear()}`,
-                    startDate: '',
-                    endDate: '',
-                    feeDueDate: '',
-                    isActive: true,
-                    isCurrent: false
-                  });
-                  setFormErrors({});
-                }}
-                className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2.5 px-5 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200"
+                onClick={() => showTermForm()}
+                disabled={state.loadingStates.savingTerm}
+                className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2.5 px-5 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
               >
-                <Plus className="w-5 h-5 mr-2" />
-                Create New Term
+                {state.loadingStates.savingTerm ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5 mr-2" />
+                    Create New Term
+                  </>
+                )}
               </motion.button>
             )}
           </div>
@@ -995,243 +1118,6 @@ const TermManagement = () => {
         </div>
       </div>
 
-      {/* Term Form Modal - Updated with consistent styling */}
-      <AnimatePresence>
-        {showForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 shadow-xl"
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {editingTerm ? 'Edit Term' : 'Create New Term'}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setShowForm(false);
-                      setEditingTerm(null);
-                      setFormErrors({});
-                    }}
-                    className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full"
-                    disabled={state.loadingStates.savingTerm}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700">
-                        Term Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="termName"
-                        required
-                        disabled={state.loadingStates.savingTerm}
-                        className={`w-full px-4 py-3 rounded-lg border ${
-                          formErrors.termName 
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                            : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
-                        } focus:ring-2 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                        value={formData.termName}
-                        onChange={handleInputChange}
-                        placeholder="e.g., Term 1 2026"
-                      />
-                      {formErrors.termName && (
-                        <p className="text-sm text-red-600 mt-1 flex items-center">
-                          <AlertCircle className="w-4 h-4 mr-1" />
-                          {formErrors.termName}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700">
-                        Academic Year <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        name="academicYear"
-                        required
-                        disabled={state.loadingStates.savingTerm}
-                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200 bg-white disabled:bg-gray-50"
-                        value={formData.academicYear}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Year</option>
-                        {Array.from({length: 5}, (_, i) => new Date().getFullYear() + i).map(year => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700">
-                        Start Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="startDate"
-                        required
-                        disabled={state.loadingStates.savingTerm}
-                        className={`w-full px-4 py-3 rounded-lg border ${
-                          formErrors.startDate 
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                            : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
-                        } focus:ring-2 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                        value={formData.startDate}
-                        onChange={handleInputChange}
-                      />
-                      {formErrors.startDate && (
-                        <p className="text-sm text-red-600 mt-1 flex items-center">
-                          <AlertCircle className="w-4 h-4 mr-1" />
-                          {formErrors.startDate}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700">
-                        End Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="endDate"
-                        required
-                        disabled={state.loadingStates.savingTerm}
-                        className={`w-full px-4 py-3 rounded-lg border ${
-                          formErrors.endDate 
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                            : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
-                        } focus:ring-2 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                        value={formData.endDate}
-                        onChange={handleInputChange}
-                      />
-                      {formErrors.endDate && (
-                        <p className="text-sm text-red-600 mt-1 flex items-center">
-                          <AlertCircle className="w-4 h-4 mr-1" />
-                          {formErrors.endDate}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-gray-700">
-                        Fee Due Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        name="feeDueDate"
-                        required
-                        disabled={state.loadingStates.savingTerm}
-                        className={`w-full px-4 py-3 rounded-lg border ${
-                          formErrors.feeDueDate 
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                            : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
-                        } focus:ring-2 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                        value={formData.feeDueDate}
-                        onChange={handleInputChange}
-                      />
-                      {formErrors.feeDueDate && (
-                        <p className="text-sm text-red-600 mt-1 flex items-center">
-                          <AlertCircle className="w-4 h-4 mr-1" />
-                          {formErrors.feeDueDate}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-6 pt-4">
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          name="isActive"
-                          className="sr-only"
-                          disabled={state.loadingStates.savingTerm}
-                          checked={formData.isActive}
-                          onChange={handleInputChange}
-                        />
-                        <div className={`w-12 h-6 rounded-full transition-all duration-200 ${
-                          formData.isActive ? 'bg-indigo-600' : 'bg-gray-300'
-                        }`}>
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
-                            formData.isActive ? 'left-7' : 'left-1'
-                          }`}></div>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium text-gray-700">Active Term</span>
-                    </label>
-                    
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          name="isCurrent"
-                          className="sr-only"
-                          disabled={state.loadingStates.savingTerm}
-                          checked={formData.isCurrent}
-                          onChange={handleInputChange}
-                        />
-                        <div className={`w-12 h-6 rounded-full transition-all duration-200 ${
-                          formData.isCurrent ? 'bg-green-600' : 'bg-gray-300'
-                        }`}>
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
-                            formData.isCurrent ? 'left-7' : 'left-1'
-                          }`}></div>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium text-gray-700">Set as Current Term</span>
-                    </label>
-                  </div>
-
-                  <div className="flex justify-end space-x-3 pt-6 border-t border-gray-100">
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        setShowForm(false);
-                        setEditingTerm(null);
-                        setFormErrors({});
-                      }}
-                      disabled={state.loadingStates.savingTerm}
-                      className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium transition-colors duration-200 disabled:opacity-50"
-                    >
-                      Cancel
-                    </motion.button>
-                    <motion.button
-                      type="submit"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      disabled={state.loadingStates.savingTerm}
-                      className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-3 px-8 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
-                    >
-                      {state.loadingStates.savingTerm ? (
-                        <>
-                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-5 h-5 mr-2" />
-                          {editingTerm ? 'Update Term' : 'Create Term'}
-                        </>
-                      )}
-                    </motion.button>
-                  </div>
-                </form>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Terms List */}
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
         <div className="p-6 border-b border-gray-100">
@@ -1266,12 +1152,15 @@ const TermManagement = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-2">No terms found</h3>
               <p className="text-gray-600 mb-6">Create your first academic term to get started</p>
               {(isAdmin || isAccountant || hasRole('ADMIN') || hasRole('ACCOUNTANT')) && (
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="text-indigo-600 hover:text-indigo-800 font-medium"
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => showTermForm()}
+                  className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2.5 px-5 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200 mx-auto"
                 >
+                  <Plus className="w-5 h-5 mr-2" />
                   Create New Term
-                </button>
+                </motion.button>
               )}
             </div>
           ) : (
@@ -1293,9 +1182,6 @@ const TermManagement = () => {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -1360,45 +1246,6 @@ const TermManagement = () => {
                         }`}>
                           {term.isCurrent ? 'Current' : term.isActive ? 'Active' : 'Inactive'}
                         </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex space-x-2">
-                          {!term.isCurrent && (isAdmin || isAccountant || hasRole('ADMIN') || hasRole('ACCOUNTANT')) && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleSetCurrent(term.id)}
-                              disabled={state.loadingStates.settingCurrent}
-                              className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center px-3 py-2 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              {state.loadingStates.settingCurrent ? 'Setting...' : 'Set Current'}
-                            </motion.button>
-                          )}
-                          {(isAdmin || isAccountant || hasRole('ADMIN') || hasRole('ACCOUNTANT')) && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleEdit(term)}
-                              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center px-3 py-2 hover:bg-indigo-50 rounded-lg transition-colors"
-                            >
-                              <Edit2 className="w-4 h-4 mr-1" />
-                              Edit
-                            </motion.button>
-                          )}
-                          {!term.isCurrent && isAdmin && hasRole('ADMIN') && (
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleDelete(term.id)}
-                              disabled={state.loadingStates.deletingTerm}
-                              className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center px-3 py-2 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                            >
-                              <Trash2 className="w-4 h-4 mr-1" />
-                              {state.loadingStates.deletingTerm ? 'Deleting...' : 'Delete'}
-                            </motion.button>
-                          )}
-                        </div>
                       </td>
                     </motion.tr>
                   ))}

@@ -261,7 +261,7 @@ const PaymentTransactionCard = ({ payment, student }) => (
       <div className="flex items-center gap-2">
         <Calendar className="w-3 h-3 text-gray-500" />
         <span className="text-sm font-medium text-gray-900">
-          {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+          {new Date(payment.paymentDate).toLocaleDateString('en-KE', {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
@@ -285,7 +285,7 @@ const PaymentTransactionCard = ({ payment, student }) => (
         )}
       </div>
       <span className="text-lg font-bold text-emerald-600">
-        ₹{payment.amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+        KSh {payment.amount?.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
       </span>
     </div>
     
@@ -743,15 +743,15 @@ const FeeCollection = () => {
               <div className="grid grid-cols-3 gap-4 mt-4">
                 <div className="text-center">
                   <p className="text-xs text-gray-500">Total Fee</p>
-                  <p className="text-lg font-bold">₹{student.totalFee?.toLocaleString('en-IN') || '0'}</p>
+                  <p className="text-lg font-bold">KSh {student.totalFee?.toLocaleString('en-KE') || '0'}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500">Total Paid</p>
-                  <p className="text-lg font-bold text-emerald-600">₹{history.totalPaid?.toLocaleString('en-IN') || '0'}</p>
+                  <p className="text-lg font-bold text-emerald-600">KSh {history.totalPaid?.toLocaleString('en-KE') || '0'}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500">Pending</p>
-                  <p className="text-lg font-bold text-rose-600">₹{history.totalPending?.toLocaleString('en-IN') || '0'}</p>
+                  <p className="text-lg font-bold text-rose-600">KSh {history.totalPending?.toLocaleString('en-KE') || '0'}</p>
                 </div>
               </div>
               <div className="mt-3">
@@ -812,7 +812,7 @@ const FeeCollection = () => {
                               )}
                             </div>
                             <p className="text-xs text-gray-500">
-                              {new Date(transaction.paymentDate).toLocaleDateString('en-IN', {
+                              {new Date(transaction.paymentDate).toLocaleDateString('en-KE', {
                                 day: 'numeric',
                                 month: 'short',
                                 year: 'numeric',
@@ -824,7 +824,7 @@ const FeeCollection = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-gray-900">₹{transaction.amount?.toLocaleString('en-IN') || '0'}</p>
+                          <p className="font-bold text-gray-900">KSh {transaction.amount?.toLocaleString('en-KE') || '0'}</p>
                           <PaymentMethodBadge method={transaction.paymentMethod} />
                         </div>
                       </div>
@@ -842,7 +842,7 @@ const FeeCollection = () => {
                             {transaction.breakdown.map((item, idx) => (
                               <div key={idx} className="flex justify-between text-xs">
                                 <span className="text-gray-600">{item.category}</span>
-                                <span className="font-medium">₹{item.amount?.toFixed(2)} ({item.percentage}%)</span>
+                                <span className="font-medium">KSh {item.amount?.toFixed(2)} ({item.percentage}%)</span>
                               </div>
                             ))}
                           </div>
@@ -873,7 +873,7 @@ const FeeCollection = () => {
                     <span className="text-gray-600">First Payment</span>
                     <span className="font-medium">
                       {history.summary.firstPayment ? 
-                        new Date(history.summary.firstPayment).toLocaleDateString('en-IN', {
+                        new Date(history.summary.firstPayment).toLocaleDateString('en-KE', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric'
@@ -884,7 +884,7 @@ const FeeCollection = () => {
                     <span className="text-gray-600">Last Payment</span>
                     <span className="font-medium">
                       {history.summary.lastPayment ? 
-                        new Date(history.summary.lastPayment).toLocaleDateString('en-IN', {
+                        new Date(history.summary.lastPayment).toLocaleDateString('en-KE', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric'
@@ -900,7 +900,7 @@ const FeeCollection = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Average Payment Amount</span>
                     <span className="font-medium">
-                      ₹{history.summary.averagePaymentAmount?.toLocaleString('en-IN') || '0'}
+                      KSh {history.summary.averagePaymentAmount?.toLocaleString('en-KE') || '0'}
                     </span>
                   </div>
                 </div>
@@ -1080,7 +1080,7 @@ const FeeCollection = () => {
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-rose-600">
-                  Pending: ₹{student.pendingAmount?.toLocaleString('en-IN') || '0'}
+                  Pending: KSh {student.pendingAmount?.toLocaleString('en-KE') || '0'}
                 </p>
                 <p className="text-xs text-gray-500">Due: {student.dueDate || 'N/A'}</p>
               </div>
@@ -1178,9 +1178,9 @@ const FeeCollection = () => {
 This is a gentle reminder that the school fee for ${student.studentName} (${student.grade}) is pending.
 
 Payment Details:
-• Total Fee: ₹${student.totalFee?.toLocaleString('en-IN') || '0'}
-• Amount Paid: ₹${student.paidAmount?.toLocaleString('en-IN') || '0'}
-• Amount Due: ₹${student.pendingAmount?.toLocaleString('en-IN') || '0'}
+• Total Fee: KSh ${student.totalFee?.toLocaleString('en-KE') || '0'}
+• Amount Paid: KSh ${student.paidAmount?.toLocaleString('en-KE') || '0'}
+• Amount Due: KSh ${student.pendingAmount?.toLocaleString('en-KE') || '0'}
 • Due Date: ${student.dueDate || 'N/A'}
 
 Payment Methods Available:
@@ -1314,19 +1314,19 @@ School Accounts Department`}
                 {
                   id: 'GENTLE',
                   title: 'Gentle SMS',
-                  content: `Dear parent, fee for ${student.studentName} is pending. Amount: ₹${student.pendingAmount}. Due: ${student.dueDate}. School Accounts`,
+                  content: `Dear parent, fee for ${student.studentName} is pending. Amount: KSh ${student.pendingAmount}. Due: ${student.dueDate}. School Accounts`,
                   charCount: 120,
                 },
                 {
                   id: 'OVERDUE',
                   title: 'Urgent SMS',
-                  content: `URGENT: Fee for ${student.studentName} overdue. Pay ₹${student.pendingAmount} immediately. Contact school office.`,
+                  content: `URGENT: Fee for ${student.studentName} overdue. Pay KSh ${student.pendingAmount} immediately. Contact school office.`,
                   charCount: 110,
                 },
                 {
                   id: 'FINAL_NOTICE',
                   title: 'Final Notice',
-                  content: `FINAL NOTICE: School fee overdue for ${student.studentName}. Pay ₹${student.pendingAmount} now.`,
+                  content: `FINAL NOTICE: School fee overdue for ${student.studentName}. Pay KSh ${student.pendingAmount} now.`,
                   charCount: 90,
                 },
               ].map((template) => (
@@ -1364,7 +1364,7 @@ School Accounts Department`}
             
             <textarea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm min-h-25 font-mono"
-              defaultValue={`Dear ${student.guardianName}, fee for ${student.studentName} (${student.grade}) is pending. Amount due: ₹${student.pendingAmount}. Due date: ${student.dueDate}. Pay online or visit school office. School Accounts`}
+              defaultValue={`Dear ${student.guardianName}, fee for ${student.studentName} (${student.grade}) is pending. Amount due: KSh ${student.pendingAmount}. Due date: ${student.dueDate}. Pay online or visit school office. School Accounts`}
               onChange={(e) => {
                 const charCount = e.target.value.length;
                 document.getElementById('charCount').textContent = charCount;
@@ -1450,7 +1450,7 @@ School Accounts Department`}
               {selected.length} student{selected.length > 1 ? 's' : ''} selected
             </p>
             <p className="text-xs text-blue-700 mt-1">
-              Total pending amount: ₹{selected.reduce((sum, s) => sum + (s.pendingAmount || 0), 0).toLocaleString('en-IN')}
+              Total pending amount: KSh {selected.reduce((sum, s) => sum + (s.pendingAmount || 0), 0).toLocaleString('en-KE')}
             </p>
           </div>
           
@@ -1721,9 +1721,9 @@ School Accounts Department`}
   const stats = useMemo(() => {
     if (!dashboardStats) {
       return {
-        totalCollected: '₹0',
-        totalPending: '₹0',
-        totalFee: '₹0',
+        totalCollected: 'KSh 0',
+        totalPending: 'KSh 0',
+        totalFee: 'KSh 0',
         collectionRate: '0%',
         paidCount: 0,
         overdueCount: 0,
@@ -1737,9 +1737,9 @@ School Accounts Department`}
     }
 
     return {
-      totalCollected: `₹${(dashboardStats.totalCollected || 0).toLocaleString('en-IN')}`,
-      totalPending: `₹${(dashboardStats.totalPending || 0).toLocaleString('en-IN')}`,
-      totalFee: `₹${(dashboardStats.totalFee || 0).toLocaleString('en-IN')}`,
+      totalCollected: `KSh ${(dashboardStats.totalCollected || 0).toLocaleString('en-KE')}`,
+      totalPending: `KSh ${(dashboardStats.totalPending || 0).toLocaleString('en-KE')}`,
+      totalFee: `KSh ${(dashboardStats.totalFee || 0).toLocaleString('en-KE')}`,
       collectionRate: `${dashboardStats.collectionRate?.toFixed(1) || '0'}%`,
       paidCount: dashboardStats.paidStudents || 0,
       overdueCount: dashboardStats.overdueStudents || 0,
@@ -1994,10 +1994,10 @@ School Accounts Department`}
                   stroke="#6b7280" 
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(value) => `₹${(value/1000000).toFixed(0)}M`}
+                  tickFormatter={(value) => `KSh ${(value/1000000).toFixed(0)}M`}
                 />
                 <Tooltip 
-                  formatter={(value) => [`₹${(value/1000000).toFixed(2)}M`, 'Amount']}
+                  formatter={(value) => [`KSh ${(value/1000000).toFixed(2)}M`, 'Amount']}
                   labelStyle={{ color: '#374151', fontWeight: 600 }}
                   contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb' }}
                 />
@@ -2135,7 +2135,7 @@ School Accounts Department`}
                       />
                     </div>
                     <div className="text-right text-sm text-rose-600 font-medium">
-                      ₹{item.amount?.toLocaleString('en-IN') || '0'}
+                      KSh {item.amount?.toLocaleString('en-KE') || '0'}
                     </div>
                   </div>
                 ))}
@@ -2208,7 +2208,7 @@ School Accounts Department`}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600">{payment.studentGrade} • {new Date(payment.paymentDate).toLocaleDateString('en-IN', {
+                    <p className="text-sm text-gray-600">{payment.studentGrade} • {new Date(payment.paymentDate).toLocaleDateString('en-KE', {
                       day: 'numeric',
                       month: 'short',
                       year: 'numeric',
@@ -2221,7 +2221,7 @@ School Accounts Department`}
                 
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="font-bold text-lg text-gray-900">₹{payment.amount?.toLocaleString('en-IN') || '0'}</p>
+                    <p className="font-bold text-lg text-gray-900">KSh {payment.amount?.toLocaleString('en-KE') || '0'}</p>
                     <PaymentMethodBadge method={payment.paymentMethod} />
                   </div>
                   <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -2362,10 +2362,10 @@ School Accounts Department`}
                     </span>
                   </div>
                   <span className="text-sm text-blue-700">
-                    Total pending: ₹{students
+                    Total pending: KSh {students
                       .filter(s => selectedStudents.includes(s.studentId))
                       .reduce((sum, s) => sum + (s.pendingAmount || 0), 0)
-                      .toLocaleString('en-IN')}
+                      .toLocaleString('en-KE')}
                   </span>
                 </div>
                 <div className="flex gap-2">
@@ -2468,14 +2468,14 @@ School Accounts Department`}
                           <div className="text-xs space-y-1">
                             <p className="text-gray-500">Due: {student.dueDate || 'N/A'}</p>
                             {student.lastPaymentDate && (
-                              <p className="text-emerald-600">Last payment: {new Date(student.lastPaymentDate).toLocaleDateString('en-IN', {
+                              <p className="text-emerald-600">Last payment: {new Date(student.lastPaymentDate).toLocaleDateString('en-KE', {
                                 day: 'numeric',
                                 month: 'short',
                                 year: 'numeric'
                               })}</p>
                             )}
                             {student.lastReminderDate && (
-                              <p className="text-amber-600">Last reminder: {new Date(student.lastReminderDate).toLocaleDateString('en-IN', {
+                              <p className="text-amber-600">Last reminder: {new Date(student.lastReminderDate).toLocaleDateString('en-KE', {
                                 day: 'numeric',
                                 month: 'short',
                                 year: 'numeric'
@@ -2488,15 +2488,15 @@ School Accounts Department`}
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Total:</span>
-                            <span className="font-semibold">₹{student.totalFee?.toLocaleString('en-IN') || '0'}</span>
+                            <span className="font-semibold">KSh {student.totalFee?.toLocaleString('en-KE') || '0'}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Paid:</span>
-                            <span className="font-semibold text-emerald-600">₹{student.paidAmount?.toLocaleString('en-IN') || '0'}</span>
+                            <span className="font-semibold text-emerald-600">KSh {student.paidAmount?.toLocaleString('en-KE') || '0'}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Pending:</span>
-                            <span className="font-semibold text-rose-600">₹{student.pendingAmount?.toLocaleString('en-IN') || '0'}</span>
+                            <span className="font-semibold text-rose-600">KSh {student.pendingAmount?.toLocaleString('en-KE') || '0'}</span>
                           </div>
                           
                           {/* Progress Bar - Now calculated on frontend */}

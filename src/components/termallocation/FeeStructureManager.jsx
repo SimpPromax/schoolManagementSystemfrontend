@@ -37,13 +37,87 @@ import {
   Users,
   Folder
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
+
+// ========== SWEETALERT2 STYLING ==========
+
+const showSuccessAlert = (title, message) => {
+  MySwal.fire({
+    title: <span className="text-emerald-600">{title}</span>,
+    html: <p className="text-gray-700">{message}</p>,
+    icon: 'success',
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#10b981',
+    showCloseButton: true,
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl',
+      title: 'text-lg font-bold',
+      confirmButton: 'px-4 py-2 rounded-lg font-medium'
+    }
+  });
+};
+
+const showErrorAlert = (title, message) => {
+  MySwal.fire({
+    title: <span className="text-rose-600">{title}</span>,
+    html: <p className="text-gray-700">{message}</p>,
+    icon: 'error',
+    confirmButtonText: 'Try Again',
+    confirmButtonColor: '#ef4444',
+    showCloseButton: true,
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl',
+      title: 'text-lg font-bold',
+      confirmButton: 'px-4 py-2 rounded-lg font-medium'
+    }
+  });
+};
+
+const showWarningAlert = (title, message) => {
+  return MySwal.fire({
+    title: <span className="text-amber-600">{title}</span>,
+    html: <p className="text-gray-700">{message}</p>,
+    icon: 'warning',
+    confirmButtonColor: '#f59e0b',
+    cancelButtonColor: '#6b7280',
+    showCloseButton: true,
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl',
+      title: 'text-lg font-bold',
+      confirmButton: 'px-4 py-2 rounded-lg font-medium',
+      cancelButton: 'px-4 py-2 rounded-lg font-medium'
+    },
+    showConfirmButton: true,
+    showCancelButton: false,
+    confirmButtonText: 'OK'
+  });
+};
+
+const showConfirmDialog = (title, message, confirmText, cancelText) => {
+  return MySwal.fire({
+    title: <span className="text-gray-900">{title}</span>,
+    html: <p className="text-gray-700">{message}</p>,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: confirmText,
+    cancelButtonText: cancelText,
+    confirmButtonColor: '#3b82f6',
+    cancelButtonColor: '#6b7280',
+    reverseButtons: true,
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl',
+      title: 'text-lg font-bold',
+      confirmButton: 'px-4 py-2 rounded-lg font-medium',
+      cancelButton: 'px-4 py-2 rounded-lg font-medium'
+    }
+  });
+};
 
 // ========== API CONFIGURATION ==========
 
@@ -163,46 +237,13 @@ const handleUnauthorized = () => {
     text: 'Your session has expired. Please login again.',
     icon: 'warning',
     confirmButtonText: 'Login',
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl',
+      title: 'text-lg font-bold',
+      confirmButton: 'px-4 py-2 rounded-lg font-medium'
+    }
   }).then(() => {
     window.location.href = '/login';
-  });
-};
-
-// ========== ALERT UTILITIES ==========
-
-const showSuccessAlert = (title, message) => {
-  MySwal.fire({
-    title: <span className="text-emerald-600">{title}</span>,
-    html: <p className="text-gray-700">{message}</p>,
-    icon: 'success',
-    confirmButtonText: 'OK',
-    confirmButtonColor: '#10b981',
-    showCloseButton: true,
-  });
-};
-
-const showErrorAlert = (title, message) => {
-  MySwal.fire({
-    title: <span className="text-rose-600">{title}</span>,
-    html: <p className="text-gray-700">{message}</p>,
-    icon: 'error',
-    confirmButtonText: 'OK',
-    confirmButtonColor: '#ef4444',
-    showCloseButton: true,
-  });
-};
-
-const showConfirmDialog = (title, message, confirmText, cancelText) => {
-  return MySwal.fire({
-    title: <span className="text-gray-900">{title}</span>,
-    html: <p className="text-gray-700">{message}</p>,
-    icon: 'question',
-    showCancelButton: true,
-    confirmButtonText: confirmText,
-    cancelButtonText: cancelText,
-    confirmButtonColor: '#3b82f6',
-    cancelButtonColor: '#6b7280',
-    reverseButtons: true,
   });
 };
 
@@ -447,204 +488,32 @@ const CustomDropdown = ({
   );
 };
 
-// ========== AUTO-BILLING MODAL ==========
+// ========== FORM VALIDATION ==========
 
-const AutoBillingModal = ({ 
-  isOpen, 
-  onClose, 
-  grades, 
-  terms, 
-  currentTermId,
-  onAutoBillAll,
-  onAutoBillByGrade,
-  loading,
-  // Controlled state from parent
-  selectedGrade,
-  selectedTermId,
-  onGradeChange,
-  onTermChange
-}) => {
-  const handleAutoBillAll = async () => {
-    if (!selectedTermId) {
-      showErrorAlert('Term Required', 'Please select a term');
-      return;
+const validateFeeStructureForm = (formData) => {
+  const errors = {};
+  
+  if (!formData.termId) {
+    errors.termId = 'Please select a term';
+  }
+  
+  if (!formData.grade) {
+    errors.grade = 'Please select a grade';
+  }
+  
+  // Validate numeric fields
+  const numericFields = ['tuitionFee', 'basicFee', 'examinationFee', 'transportFee', 
+                        'libraryFee', 'sportsFee', 'activityFee', 'hostelFee', 
+                        'uniformFee', 'bookFee', 'otherFees'];
+  
+  numericFields.forEach(field => {
+    const value = formData[field];
+    if (value !== '' && (isNaN(value) || parseFloat(value) < 0)) {
+      errors[field] = 'Please enter a valid amount';
     }
-
-    const termName = terms.find(t => t.id === selectedTermId)?.termName || 'selected term';
-    
-    const confirmed = await showConfirmDialog(
-      'Auto-bill All Students',
-      `This will bill ALL active students for ${termName} using their grade fee structures. Are you sure?`,
-      'Yes, Bill All Students',
-      'Cancel'
-    );
-    
-    if (confirmed.isConfirmed) {
-      onAutoBillAll(selectedTermId);
-    }
-  };
-
-  const handleAutoBillByGrade = async () => {
-    if (!selectedGrade) {
-      showErrorAlert('Grade Required', 'Please select a grade to auto-bill');
-      return;
-    }
-
-    if (!selectedTermId) {
-      showErrorAlert('Term Required', 'Please select a term');
-      return;
-    }
-
-    const termName = terms.find(t => t.id === selectedTermId)?.termName || 'selected term';
-    
-    const confirmed = await showConfirmDialog(
-      'Auto-bill by Grade',
-      `This will bill all students in ${selectedGrade} for ${termName}. Are you sure?`,
-      'Yes, Bill This Grade',
-      'Cancel'
-    );
-    
-    if (confirmed.isConfirmed) {
-      onAutoBillByGrade(selectedGrade, selectedTermId);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="bg-white rounded-2xl max-w-md w-full relative z-60"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <Zap className="w-6 h-6 text-amber-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">Auto-billing</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full"
-              disabled={loading}
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          
-          <p className="text-gray-600 mb-6">
-            Automatically generate fee bills for students based on their grade fee structures.
-          </p>
-
-          {/* Term Selection */}
-          <div className="mb-6">
-            <CustomDropdown
-              label="Select Term"
-              value={selectedTermId}
-              onChange={onTermChange}
-              options={terms.map(term => ({
-                id: term.id,
-                name: `${term.termName} ${term.academicYear}`
-              }))}
-              placeholder="Select Term"
-              disabled={loading}
-              required={true}
-            />
-          </div>
-
-          {/* Auto-bill All Students Card */}
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="bg-linear-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-5 mb-4 cursor-pointer"
-            onClick={handleAutoBillAll}
-          >
-            <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg mr-4">
-                <Users className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 mb-1">Bill All Students</h3>
-                <p className="text-sm text-gray-700">
-                  Bill ALL active students for the selected term
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Auto-bill by Grade Card */}
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            className="bg-linear-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-5 mb-6"
-          >
-            <div className="mb-4">
-              <CustomDropdown
-                label="Select Grade"
-                value={selectedGrade}
-                onChange={onGradeChange}
-                options={grades.map(grade => ({
-                  id: grade,
-                  name: grade
-                }))}
-                placeholder="Select Grade"
-                disabled={loading}
-                required={true}
-              />
-            </div>
-            
-            <button
-              onClick={handleAutoBillByGrade}
-              disabled={loading || !selectedGrade || !selectedTermId}
-              className="w-full bg-linear-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium py-3 px-4 rounded-xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Folder className="w-5 h-5 mr-2" />
-                  Bill {selectedGrade ? `${selectedGrade} Students` : 'by Grade'}
-                </>
-              )}
-            </button>
-          </motion.div>
-
-          {/* Info Box */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-start">
-              <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2 shrink-0" />
-              <div className="text-sm text-yellow-800">
-                <p className="font-medium mb-1">How auto-billing works:</p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>Uses the grade fee structure defined in the system</li>
-                  <li>Only bills active students with assigned grades</li>
-                  <li>Skips students already billed for the term</li>
-                  <li>Updates student fee summaries automatically</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Close Button */}
-          <div className="flex justify-end mt-6 pt-6 border-t border-gray-100">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium transition-colors duration-200"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
+  });
+  
+  return errors;
 };
 
 // ========== STATE MANAGEMENT ==========
@@ -722,9 +591,6 @@ const FeeStructureManager = () => {
   const [state, dispatch] = useReducer(feeStructureReducer, initialState);
   const [selectedTerm, setSelectedTerm] = useState('');
   const [selectedGrade, setSelectedGrade] = useState(searchParams.get('grade') || '');
-  const [showForm, setShowForm] = useState(false);
-  const [showAutoBilling, setShowAutoBilling] = useState(false);
-  const [editingStructure, setEditingStructure] = useState(null);
   const [grades, setGrades] = useState([]);
   const [gradesLoading, setGradesLoading] = useState(false);
   const [gradesError, setGradesError] = useState(null);
@@ -734,28 +600,10 @@ const FeeStructureManager = () => {
     selectedGrade: '',
     selectedTermId: selectedTerm || '',
   });
-  
-  const [formData, setFormData] = useState({
-    termId: '',
-    grade: '',
-    tuitionFee: '',
-    basicFee: '',
-    examinationFee: '',
-    transportFee: '',
-    libraryFee: '',
-    sportsFee: '',
-    activityFee: '',
-    hostelFee: '',
-    uniformFee: '',
-    bookFee: '',
-    otherFees: '',
-    isActive: true,
-  });
-  const [formErrors, setFormErrors] = useState({});
 
   // ========== DATA FETCHING ==========
 
-  const setLoading = useCallback((key, value) => {
+  const setLoadingState = useCallback((key, value) => {
     dispatch({ type: 'SET_LOADING', payload: { [key]: value } });
   }, []);
 
@@ -840,7 +688,7 @@ const FeeStructureManager = () => {
   }, []);
 
   const fetchTerms = useCallback(async () => {
-    setLoading('terms', true);
+    setLoadingState('terms', true);
     try {
       const response = await feeApi.get('/terms');
       const responseData = handleApiResponse(response);
@@ -894,12 +742,6 @@ const FeeStructureManager = () => {
       if (termsArray.length > 0 && !selectedTerm) {
         const currentTerm = termsArray.find(t => t.isCurrent);
         setSelectedTerm(currentTerm?.id || termsArray[0].id);
-        setFormData(prev => ({ ...prev, termId: currentTerm?.id || termsArray[0].id }));
-        // Also update auto-billing state
-        setAutoBillingState(prev => ({
-          ...prev,
-          selectedTermId: currentTerm?.id || termsArray[0].id
-        }));
       }
       
     } catch (error) {
@@ -907,9 +749,9 @@ const FeeStructureManager = () => {
       setError('terms', errorMessage);
       console.error('Terms fetch error:', error);
     } finally {
-      setLoading('terms', false);
+      setLoadingState('terms', false);
     }
-  }, [selectedTerm, setLoading, setError]);
+  }, [selectedTerm, setLoadingState, setError]);
 
   const fetchFeeStructures = useCallback(async () => {
     if (!selectedTerm) {
@@ -917,7 +759,7 @@ const FeeStructureManager = () => {
       return;
     }
 
-    setLoading('feeStructures', true);
+    setLoadingState('feeStructures', true);
     try {
       const response = await feeApi.get(`/fee-structure/term/${selectedTerm}`);
       const feeData = handleApiResponse(response);
@@ -983,15 +825,15 @@ const FeeStructureManager = () => {
       setError('feeStructures', errorMessage);
       console.error('Fee structures fetch error:', error);
     } finally {
-      setLoading('feeStructures', false);
+      setLoadingState('feeStructures', false);
     }
-  }, [selectedTerm, selectedGrade, setLoading, setError]);
+  }, [selectedTerm, selectedGrade, setLoadingState, setError]);
 
   // ========== REFRESH FUNCTION ==========
 
   const refreshAllData = useCallback(async () => {
     dispatch({ type: 'RESET_ERRORS' });
-    setLoading('refreshing', true);
+    setLoadingState('refreshing', true);
     setGradesError(null);
     
     try {
@@ -1001,21 +843,35 @@ const FeeStructureManager = () => {
         fetchFeeStructures()
       ]);
       
-      showAlert('success', 'Data Refreshed', 'All fee structure data has been refreshed successfully.');
+      showSuccessAlert('Data Refreshed', 'All fee structure data has been refreshed successfully.');
       return true;
     } catch (error) {
       console.error('Refresh error:', error);
-      showAlert('error', 'Refresh Failed', 'Failed to refresh fee structure data');
+      showErrorAlert('Refresh Failed', 'Failed to refresh fee structure data');
       return false;
     } finally {
-      setLoading('refreshing', false);
+      setLoadingState('refreshing', false);
     }
-  }, [fetchGrades, fetchTerms, fetchFeeStructures, showAlert, setLoading]);
+  }, [fetchGrades, fetchTerms, fetchFeeStructures, setLoadingState]);
 
   // ========== AUTO-BILLING FUNCTIONS ==========
 
   const handleAutoBillAllStudents = useCallback(async (termId) => {
-    setLoading('autoBilling', true);
+    setLoadingState('autoBilling', true);
+    
+    MySwal.fire({
+      title: 'Auto-billing All Students...',
+      text: 'Please wait while we bill all active students.',
+      icon: 'info',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl'
+      },
+      didOpen: () => {
+        MySwal.showLoading();
+      }
+    });
     
     try {
       console.log('Starting auto-billing for all students, term:', termId);
@@ -1036,23 +892,38 @@ const FeeStructureManager = () => {
         }
       }
       
-      showAlert('success', 'Auto-billing Complete', successMessage);
-      setShowAutoBilling(false);
+      MySwal.close();
+      showSuccessAlert('Auto-billing Complete', successMessage);
       
       // Refresh data to show updated fee structures
       await refreshAllData();
       
     } catch (error) {
+      MySwal.close();
       console.error('Auto-billing error:', error);
       const errorMessage = handleApiError(error, 'auto-billing');
-      showAlert('error', 'Auto-billing Failed', errorMessage);
+      showErrorAlert('Auto-billing Failed', errorMessage);
     } finally {
-      setLoading('autoBilling', false);
+      setLoadingState('autoBilling', false);
     }
-  }, [setLoading, showAlert, refreshAllData]);
+  }, [setLoadingState, refreshAllData]);
 
   const handleAutoBillByGrade = useCallback(async (grade, termId) => {
-    setLoading('autoBilling', true);
+    setLoadingState('autoBilling', true);
+    
+    MySwal.fire({
+      title: 'Auto-billing Grade...',
+      text: `Please wait while we bill students in ${grade}.`,
+      icon: 'info',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl'
+      },
+      didOpen: () => {
+        MySwal.showLoading();
+      }
+    });
     
     try {
       console.log('Auto-billing grade:', grade, 'term:', termId);
@@ -1084,11 +955,14 @@ const FeeStructureManager = () => {
       console.log(`Active students in ${grade}:`, activeStudents.length);
       
       if (activeStudents.length === 0) {
-        showAlert('warning', 'No Active Students', `No active students found in grade ${grade}.`);
-        setLoading('autoBilling', false);
+        MySwal.close();
+        showWarningAlert('No Active Students', `No active students found in grade ${grade}.`);
+        setLoadingState('autoBilling', false);
         return;
       }
 
+      MySwal.close();
+      
       const result = await showConfirmDialog(
         'Confirm Grade Auto-billing',
         `This will bill ${activeStudents.length} active students in ${grade} for the selected term. Continue?`,
@@ -1097,9 +971,23 @@ const FeeStructureManager = () => {
       );
 
       if (!result.isConfirmed) {
-        setLoading('autoBilling', false);
+        setLoadingState('autoBilling', false);
         return;
       }
+
+      MySwal.fire({
+        title: 'Processing Auto-billing...',
+        text: `Billing ${activeStudents.length} students in ${grade}`,
+        icon: 'info',
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        customClass: {
+          popup: 'rounded-2xl border border-gray-200 shadow-xl'
+        },
+        didOpen: () => {
+          MySwal.showLoading();
+        }
+      });
 
       let successCount = 0;
       let failedCount = 0;
@@ -1125,6 +1013,8 @@ const FeeStructureManager = () => {
         }
       }
 
+      MySwal.close();
+
       // Show results
       let resultMessage = `Auto-billing for ${grade} completed: ${successCount} successful, ${failedCount} failed.`;
       
@@ -1133,163 +1023,562 @@ const FeeStructureManager = () => {
         if (errors.length > 0) {
           console.error('Auto-billing errors:', errors);
         }
+        showWarningAlert('Auto-billing Complete', resultMessage);
+      } else {
+        showSuccessAlert('Auto-billing Complete', resultMessage);
       }
-      
-      showAlert(
-        successCount > 0 ? 'success' : 'warning',
-        'Grade Auto-billing Complete',
-        resultMessage
-      );
-      
-      setShowAutoBilling(false);
       
       // Refresh data
       await refreshAllData();
       
     } catch (error) {
+      MySwal.close();
       console.error('Grade auto-billing error:', error);
       const errorMessage = handleApiError(error, 'grade auto-billing');
-      showAlert('error', 'Auto-billing Failed', errorMessage);
+      showErrorAlert('Auto-billing Failed', errorMessage);
     } finally {
-      setLoading('autoBilling', false);
+      setLoadingState('autoBilling', false);
     }
-  }, [setLoading, showAlert, refreshAllData]);
+  }, [setLoadingState, refreshAllData]);
 
-  // ========== AUTO-BILLING STATE HANDLERS ==========
+  // ========== SWEETALERT2 AUTO-BILLING MODAL ==========
 
-  const handleAutoBillingGradeChange = useCallback((e) => {
-    setAutoBillingState(prev => ({
-      ...prev,
-      selectedGrade: e.target.value
-    }));
-  }, []);
+  const showAutoBillingModal = useCallback(() => {
+    MySwal.fire({
+      title: <span className="text-gray-900">Auto-billing</span>,
+      html: (
+        <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <Zap className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-gray-700">
+                Automatically generate fee bills for students based on their grade fee structures.
+              </p>
+            </div>
+          </div>
 
-  const handleAutoBillingTermChange = useCallback((e) => {
-    setAutoBillingState(prev => ({
-      ...prev,
-      selectedTermId: e.target.value
-    }));
-  }, []);
+          {/* Term Selection */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Select Term <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="autoBillingTermId"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200 bg-white"
+              defaultValue={autoBillingState.selectedTermId}
+            >
+              <option value="">Select Term</option>
+              {state.terms.map(term => (
+                <option key={term.id} value={term.id}>
+                  {term.termName} {term.academicYear}
+                </option>
+              ))}
+            </select>
+          </div>
 
-  const handleOpenAutoBilling = useCallback(() => {
-    // Reset auto-billing state when opening modal
-    setAutoBillingState({
-      selectedGrade: '',
-      selectedTermId: selectedTerm || ''
-    });
-    setShowAutoBilling(true);
-  }, [selectedTerm]);
+          {/* Auto-bill All Students Card */}
+          <div 
+            className="bg-linear-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-5 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => {
+              const termId = document.getElementById('autoBillingTermId').value;
+              if (!termId) {
+                MySwal.showValidationMessage('Please select a term first');
+                return;
+              }
+              MySwal.close();
+              handleAutoBillAllStudents(termId);
+            }}
+          >
+            <div className="flex items-center">
+              <div className="p-3 bg-blue-100 rounded-lg mr-4">
+                <Users className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-1">Bill All Students</h3>
+                <p className="text-sm text-gray-700">
+                  Bill ALL active students for the selected term
+                </p>
+              </div>
+            </div>
+          </div>
 
-  // ========== INITIAL LOAD ==========
+          {/* Auto-bill by Grade Section */}
+          <div className="bg-linear-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-5">
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Select Grade <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="autoBillingGrade"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200 bg-white"
+                defaultValue={autoBillingState.selectedGrade}
+              >
+                <option value="">Select Grade</option>
+                {grades.map(grade => (
+                  <option key={grade} value={grade}>{grade}</option>
+                ))}
+              </select>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => {
+                const grade = document.getElementById('autoBillingGrade').value;
+                const termId = document.getElementById('autoBillingTermId').value;
+                
+                if (!grade || !termId) {
+                  MySwal.showValidationMessage('Please select both grade and term');
+                  return;
+                }
+                
+                MySwal.close();
+                handleAutoBillByGrade(grade, termId);
+              }}
+              className="w-full bg-linear-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium py-3 px-4 rounded-xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <Folder className="w-5 h-5 mr-2" />
+              Bill by Grade
+            </button>
+          </div>
 
-  useEffect(() => {
-    const loadInitialData = async () => {
-      if (!isAuthenticated) {
-        navigate('/login');
-        return;
+          {/* Info Box */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2 shrink-0" />
+              <div className="text-sm text-yellow-800">
+                <p className="font-medium mb-1">How auto-billing works:</p>
+                <ul className="list-disc pl-4 space-y-1">
+                  <li>Uses the grade fee structure defined in the system</li>
+                  <li>Only bills active students with assigned grades</li>
+                  <li>Skips students already billed for the term</li>
+                  <li>Updates student fee summaries automatically</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+      showCancelButton: true,
+      confirmButtonText: 'Close',
+      cancelButtonText: null,
+      showConfirmButton: false,
+      cancelButtonColor: '#6b7280',
+      width: 600,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl',
+        title: 'text-lg font-bold mb-4',
+        cancelButton: 'px-4 py-2.5 rounded-lg font-medium',
+        htmlContainer: 'overflow-visible'
       }
+    });
+  }, [state.terms, grades, autoBillingState.selectedTermId, autoBillingState.selectedGrade, handleAutoBillAllStudents, handleAutoBillByGrade]);
+
+  // ========== SWEETALERT2 FORM HANDLING ==========
+
+  const showFeeStructureForm = (structure = null) => {
+    const isEdit = !!structure;
+    
+    // Find the matching grade from our grades array for editing
+    let matchingGrade = structure?.grade || selectedGrade || '';
+    if (structure && structure.grade) {
+      const structureGradeNumber = extractGradeNumber(structure.grade);
+      if (structureGradeNumber !== null) {
+        const foundGrade = grades.find(grade => {
+          const gradeNumber = extractGradeNumber(grade);
+          return gradeNumber === structureGradeNumber;
+        });
+        if (foundGrade) {
+          matchingGrade = foundGrade;
+        }
+      }
+    }
+
+    const defaultFormData = {
+      termId: structure?.academicTerm?.id || structure?.termId || selectedTerm || '',
+      grade: matchingGrade,
+      tuitionFee: structure?.tuitionFee || '',
+      basicFee: structure?.basicFee || '',
+      examinationFee: structure?.examinationFee || '',
+      transportFee: structure?.transportFee || '',
+      libraryFee: structure?.libraryFee || '',
+      sportsFee: structure?.sportsFee || '',
+      activityFee: structure?.activityFee || '',
+      hostelFee: structure?.hostelFee || '',
+      uniformFee: structure?.uniformFee || '',
+      bookFee: structure?.bookFee || '',
+      otherFees: structure?.otherFees || '',
+      isActive: structure?.isActive !== false,
+    };
+
+    // Function to calculate total
+    const calculateTotal = (formData) => {
+      const fees = [
+        parseFloat(formData.tuitionFee) || 0,
+        parseFloat(formData.basicFee) || 0,
+        parseFloat(formData.examinationFee) || 0,
+        parseFloat(formData.transportFee) || 0,
+        parseFloat(formData.libraryFee) || 0,
+        parseFloat(formData.sportsFee) || 0,
+        parseFloat(formData.activityFee) || 0,
+        parseFloat(formData.hostelFee) || 0,
+        parseFloat(formData.uniformFee) || 0,
+        parseFloat(formData.bookFee) || 0,
+        parseFloat(formData.otherFees) || 0,
+      ];
+      return fees.reduce((sum, fee) => sum + fee, 0);
+    };
+
+    // Update total display function
+    const updateTotalDisplay = () => {
+      const tuitionFee = parseFloat(document.getElementById('tuitionFee')?.value) || 0;
+      const basicFee = parseFloat(document.getElementById('basicFee')?.value) || 0;
+      const examinationFee = parseFloat(document.getElementById('examinationFee')?.value) || 0;
+      const transportFee = parseFloat(document.getElementById('transportFee')?.value) || 0;
+      const libraryFee = parseFloat(document.getElementById('libraryFee')?.value) || 0;
+      const sportsFee = parseFloat(document.getElementById('sportsFee')?.value) || 0;
+      const activityFee = parseFloat(document.getElementById('activityFee')?.value) || 0;
+      const hostelFee = parseFloat(document.getElementById('hostelFee')?.value) || 0;
+      const uniformFee = parseFloat(document.getElementById('uniformFee')?.value) || 0;
+      const bookFee = parseFloat(document.getElementById('bookFee')?.value) || 0;
+      const otherFees = parseFloat(document.getElementById('otherFees')?.value) || 0;
       
-      try {
-        // Fetch grades first, then terms
-        console.log('Starting initial data load...');
-        await Promise.all([fetchGrades(), fetchTerms()]);
-        console.log('Initial data load complete');
-      } catch (error) {
-        console.error('Initial load error:', error);
-        showAlert('error', 'Load Error', 'Failed to load initial data');
+      const total = tuitionFee + basicFee + examinationFee + transportFee + 
+                   libraryFee + sportsFee + activityFee + hostelFee + 
+                   uniformFee + bookFee + otherFees;
+      
+      const totalElement = document.getElementById('totalDisplay');
+      if (totalElement) {
+        totalElement.textContent = `KES ${total.toLocaleString()}`;
       }
     };
-    
-    loadInitialData();
-  }, [isAuthenticated, navigate, fetchGrades, fetchTerms, showAlert]);
 
-  useEffect(() => {
-    if (selectedTerm) {
-      fetchFeeStructures();
-    }
-  }, [selectedTerm, fetchFeeStructures]);
+    MySwal.fire({
+      title: <span className="text-gray-900">{isEdit ? 'Edit Fee Structure' : 'Create Fee Structure'}</span>,
+      html: (
+        <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Term Dropdown */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Term <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="termId"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200 bg-white"
+                defaultValue={defaultFormData.termId}
+              >
+                <option value="">Select Term</option>
+                {state.terms.map(term => (
+                  <option key={term.id} value={term.id}>
+                    {term.termName} {term.academicYear}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-  useEffect(() => {
-    if (selectedGrade) {
-      setFormData(prev => ({ ...prev, grade: selectedGrade }));
-    }
-  }, [selectedGrade]);
+            {/* Grade Dropdown */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Grade <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="grade"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200 bg-white"
+                defaultValue={defaultFormData.grade}
+              >
+                <option value="">Select Grade</option>
+                {grades.map(grade => (
+                  <option key={grade} value={grade}>{grade}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-  // ========== FORM HANDLING ==========
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Basic Fees Card */}
+            <div className="space-y-4 p-6 border rounded-xl bg-linear-to-br from-blue-50 to-blue-100 border-blue-200">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                  <BookOpen className="w-5 h-5 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Basic Fees</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Basic Fee</label>
+                  <input
+                    type="number"
+                    id="basicFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.basicFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Tuition Fee</label>
+                  <input
+                    type="number"
+                    id="tuitionFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.tuitionFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Examination Fee</label>
+                  <input
+                    type="number"
+                    id="examinationFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.examinationFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+              </div>
+            </div>
 
-  const validateForm = () => {
-    const errors = {};
-    
-    if (!formData.termId) {
-      errors.termId = 'Please select a term';
-    }
-    
-    if (!formData.grade) {
-      errors.grade = 'Please select a grade';
-    }
-    
-    // Validate numeric fields
-    const numericFields = ['tuitionFee', 'basicFee', 'examinationFee', 'transportFee', 
-                          'libraryFee', 'sportsFee', 'activityFee', 'hostelFee', 
-                          'uniformFee', 'bookFee', 'otherFees'];
-    
-    numericFields.forEach(field => {
-      const value = formData[field];
-      if (value !== '' && (isNaN(value) || parseFloat(value) < 0)) {
-        errors[field] = 'Please enter a valid amount';
+            {/* Optional Fees Card */}
+            <div className="space-y-4 p-6 border rounded-xl bg-linear-to-br from-green-50 to-green-100 border-green-200">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-100 rounded-lg mr-3">
+                  <Trophy className="w-5 h-5 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Optional Fees</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Transport Fee</label>
+                  <input
+                    type="number"
+                    id="transportFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.transportFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Library Fee</label>
+                  <input
+                    type="number"
+                    id="libraryFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.libraryFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Sports Fee</label>
+                  <input
+                    type="number"
+                    id="sportsFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.sportsFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Fees Card */}
+            <div className="space-y-4 p-6 border rounded-xl bg-linear-to-br from-purple-50 to-purple-100 border-purple-200">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-100 rounded-lg mr-3">
+                  <Activity className="w-5 h-5 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900">Additional Fees</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Activity Fee</label>
+                  <input
+                    type="number"
+                    id="activityFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.activityFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Hostel Fee</label>
+                  <input
+                    type="number"
+                    id="hostelFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.hostelFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Uniform Fee</label>
+                  <input
+                    type="number"
+                    id="uniformFee"
+                    step="0.01"
+                    min="0"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:ring-opacity-20 transition-all duration-200"
+                    defaultValue={defaultFormData.uniformFee}
+                    placeholder="0"
+                    onInput={updateTotalDisplay}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Book Fee</label>
+              <input
+                type="number"
+                id="bookFee"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200"
+                defaultValue={defaultFormData.bookFee}
+                placeholder="0"
+                onInput={updateTotalDisplay}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Other Fees</label>
+              <input
+                type="number"
+                id="otherFees"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20 transition-all duration-200"
+                defaultValue={defaultFormData.otherFees}
+                placeholder="0"
+                onInput={updateTotalDisplay}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  className="sr-only"
+                  defaultChecked={defaultFormData.isActive}
+                />
+                <div className={`w-12 h-6 rounded-full transition-all duration-200 ${
+                  defaultFormData.isActive ? 'bg-indigo-600' : 'bg-gray-300'
+                }`}>
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
+                    defaultFormData.isActive ? 'left-7' : 'left-1'
+                  }`}></div>
+                </div>
+              </div>
+              <span className="text-sm font-medium text-gray-700">Active Fee Structure</span>
+            </label>
+          </div>
+
+          <div className="border-t border-gray-100 pt-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-600">Total Fee Structure</p>
+                <div id="totalDisplay" className="text-3xl font-bold text-indigo-600">
+                  KES {calculateTotal(defaultFormData).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+      showCancelButton: true,
+      confirmButtonText: isEdit ? 'Update Fee Structure' : 'Create Fee Structure',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#6b7280',
+      width: 900,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl',
+        title: 'text-lg font-bold mb-4',
+        confirmButton: 'px-4 py-2.5 rounded-lg font-medium',
+        cancelButton: 'px-4 py-2.5 rounded-lg font-medium',
+        htmlContainer: 'overflow-visible'
+      },
+      preConfirm: () => {
+        const formData = {
+          termId: document.getElementById('termId').value,
+          grade: document.getElementById('grade').value,
+          tuitionFee: document.getElementById('tuitionFee').value,
+          basicFee: document.getElementById('basicFee').value,
+          examinationFee: document.getElementById('examinationFee').value,
+          transportFee: document.getElementById('transportFee').value,
+          libraryFee: document.getElementById('libraryFee').value,
+          sportsFee: document.getElementById('sportsFee').value,
+          activityFee: document.getElementById('activityFee').value,
+          hostelFee: document.getElementById('hostelFee').value,
+          uniformFee: document.getElementById('uniformFee').value,
+          bookFee: document.getElementById('bookFee').value,
+          otherFees: document.getElementById('otherFees').value,
+          isActive: document.getElementById('isActive').checked,
+        };
+
+        const errors = validateFeeStructureForm(formData);
+        
+        if (Object.keys(errors).length > 0) {
+          const errorMessages = Object.values(errors).join('<br>');
+          MySwal.showValidationMessage(`Please fix the following errors:<br>${errorMessages}`);
+          return false;
+        }
+
+        return formData;
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        await handleSaveFeeStructure(result.value, structure?.id);
       }
     });
-    
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value === '' ? '' : parseFloat(value) || value,
+  // ========== ACTION HANDLERS ==========
+
+  const handleSaveFeeStructure = async (formData, structureId = null) => {
+    setLoadingState('savingStructure', true);
+    
+    MySwal.fire({
+      title: structureId ? 'Updating Fee Structure...' : 'Creating Fee Structure...',
+      text: 'Please wait while we save your changes.',
+      icon: 'info',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl'
+      },
+      didOpen: () => {
+        MySwal.showLoading();
+      }
     });
-    
-    // Clear error for this field
-    if (formErrors[name]) {
-      setFormErrors({
-        ...formErrors,
-        [name]: ''
-      });
-    }
-  };
-
-  const calculateTotal = () => {
-    const fees = [
-      parseFloat(formData.tuitionFee) || 0,
-      parseFloat(formData.basicFee) || 0,
-      parseFloat(formData.examinationFee) || 0,
-      parseFloat(formData.transportFee) || 0,
-      parseFloat(formData.libraryFee) || 0,
-      parseFloat(formData.sportsFee) || 0,
-      parseFloat(formData.activityFee) || 0,
-      parseFloat(formData.hostelFee) || 0,
-      parseFloat(formData.uniformFee) || 0,
-      parseFloat(formData.bookFee) || 0,
-      parseFloat(formData.otherFees) || 0,
-    ];
-    return fees.reduce((sum, fee) => sum + fee, 0);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
-    if (!isAdmin && !isAccountant && !hasRole('ADMIN') && !hasRole('ACCOUNTANT')) {
-      showAlert('error', 'Access Denied', 'Only administrators or accountants can manage fee structures');
-      return;
-    }
-    
-    setLoading('savingStructure', true);
     
     try {
       // Log the data being sent
@@ -1319,8 +1608,8 @@ const FeeStructureManager = () => {
       console.log('Data being sent to API (with numeric grade):', feeData);
 
       let response;
-      if (editingStructure) {
-        response = await feeApi.put(`/fee-structure/${editingStructure.id}`, feeData);
+      if (structureId) {
+        response = await feeApi.put(`/fee-structure/${structureId}`, feeData);
       } else {
         response = await feeApi.post('/fee-structure', feeData);
       }
@@ -1328,89 +1617,30 @@ const FeeStructureManager = () => {
       const responseData = handleApiResponse(response);
       console.log('API Response:', responseData);
       
-      showAlert(
-        'success', 
-        editingStructure ? 'Fee Structure Updated' : 'Fee Structure Created',
-        editingStructure 
+      MySwal.close();
+      
+      showSuccessAlert(
+        structureId ? 'Fee Structure Updated' : 'Fee Structure Created',
+        structureId 
           ? 'Fee structure has been updated successfully!' 
           : 'Fee structure has been created successfully!'
       );
       
-      setShowForm(false);
-      setEditingStructure(null);
-      setFormData({
-        termId: selectedTerm,
-        grade: selectedGrade || '',
-        tuitionFee: '',
-        basicFee: '',
-        examinationFee: '',
-        transportFee: '',
-        libraryFee: '',
-        sportsFee: '',
-        activityFee: '',
-        hostelFee: '',
-        uniformFee: '',
-        bookFee: '',
-        otherFees: '',
-        isActive: true,
-      });
-      setFormErrors({});
-      
       await fetchFeeStructures();
       
     } catch (error) {
+      MySwal.close();
       console.error('Save fee structure error details:', error);
       const errorMessage = handleApiError(error, 'saving fee structure');
-      showAlert('error', 'Save Failed', errorMessage);
+      showErrorAlert('Save Failed', errorMessage);
     } finally {
-      setLoading('savingStructure', false);
+      setLoadingState('savingStructure', false);
     }
-  };
-
-  const handleEdit = (structure) => {
-    console.log('Editing structure:', structure);
-    
-    // Find the matching grade from our grades array
-    const structureGradeNumber = extractGradeNumber(structure.grade);
-    let matchingGrade = structure.grade; // Default to backend value
-    
-    if (structureGradeNumber !== null) {
-      // Find first grade in our list that matches this number
-      const foundGrade = grades.find(grade => {
-        const gradeNumber = extractGradeNumber(grade);
-        return gradeNumber === structureGradeNumber;
-      });
-      
-      if (foundGrade) {
-        matchingGrade = foundGrade; // Use "10-A" instead of "10"
-      }
-    }
-    
-    setEditingStructure(structure);
-    setFormData({
-      termId: structure.academicTerm?.id || structure.termId || selectedTerm,
-      grade: matchingGrade, // Use the matching grade from our list
-      tuitionFee: structure.tuitionFee || '',
-      basicFee: structure.basicFee || '',
-      examinationFee: structure.examinationFee || '',
-      transportFee: structure.transportFee || '',
-      libraryFee: structure.libraryFee || '',
-      sportsFee: structure.sportsFee || '',
-      activityFee: structure.activityFee || '',
-      hostelFee: structure.hostelFee || '',
-      uniformFee: structure.uniformFee || '',
-      bookFee: structure.bookFee || '',
-      otherFees: structure.otherFees || '',
-      isActive: structure.isActive !== false,
-    });
-    setSelectedGrade(matchingGrade);
-    setShowForm(true);
-    setFormErrors({});
   };
 
   const handleDelete = async (structureId) => {
     if (!isAdmin && !hasRole('ADMIN')) {
-      showAlert('error', 'Access Denied', 'Only administrators can delete fee structures');
+      showErrorAlert('Access Denied', 'Only administrators can delete fee structures');
       return;
     }
     
@@ -1423,30 +1653,75 @@ const FeeStructureManager = () => {
 
     if (!result.isConfirmed) return;
 
-    setLoading('deletingStructure', true);
+    setLoadingState('deletingStructure', true);
+    
+    MySwal.fire({
+      title: 'Deleting Fee Structure...',
+      text: 'Please wait while we delete the fee structure.',
+      icon: 'info',
+      showConfirmButton: false,
+      allowOutsideClick: false,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl'
+      },
+      didOpen: () => {
+        MySwal.showLoading();
+      }
+    });
     
     try {
       const response = await feeApi.delete(`/fee-structure/${structureId}`);
       handleApiResponse(response);
       
-      showAlert('success', 'Fee Structure Deleted', 'Fee structure has been deleted successfully.');
+      MySwal.close();
+      showSuccessAlert('Fee Structure Deleted', 'Fee structure has been deleted successfully.');
       await fetchFeeStructures();
       
     } catch (error) {
+      MySwal.close();
       const errorMessage = handleApiError(error, 'deleting fee structure');
-      showAlert('error', 'Delete Failed', errorMessage);
+      showErrorAlert('Delete Failed', errorMessage);
       console.error('Delete fee structure error:', error);
     } finally {
-      setLoading('deletingStructure', false);
+      setLoadingState('deletingStructure', false);
     }
   };
+
+  // ========== INITIAL LOAD ==========
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      if (!isAuthenticated) {
+        navigate('/login');
+        return;
+      }
+      
+      try {
+        // Fetch grades first, then terms
+        console.log('Starting initial data load...');
+        await Promise.all([fetchGrades(), fetchTerms()]);
+        console.log('Initial data load complete');
+      } catch (error) {
+        console.error('Initial load error:', error);
+        showErrorAlert('Load Error', 'Failed to load initial data');
+      }
+    };
+    
+    loadInitialData();
+  }, [isAuthenticated, navigate, fetchGrades, fetchTerms]);
+
+  useEffect(() => {
+    if (selectedTerm) {
+      fetchFeeStructures();
+    }
+  }, [selectedTerm, fetchFeeStructures]);
+
+  // ========== HELPER FUNCTIONS ==========
 
   const getTermName = (termId) => {
     const term = state.terms.find(t => t.id === termId);
     return term ? `${term.termName} ${term.academicYear}` : '';
   };
-
-  const totalAmount = calculateTotal();
 
   // ========== QUICK ACTIONS ==========
 
@@ -1457,7 +1732,7 @@ const FeeStructureManager = () => {
         description: 'Generate bills for students',
         icon: Zap,
         color: 'bg-amber-100 text-amber-600',
-        onClick: handleOpenAutoBilling,
+        onClick: showAutoBillingModal,
         requiredRoles: ['ADMIN', 'ACCOUNTANT']
       },
       {
@@ -1490,7 +1765,7 @@ const FeeStructureManager = () => {
       if (!action.requiredRoles || action.requiredRoles.length === 0) return true;
       return hasAnyRole(action.requiredRoles) || isAdmin || isAccountant;
     });
-  }, [isAdmin, isAccountant, hasAnyRole, handleOpenAutoBilling]);
+  }, [isAdmin, isAccountant, hasAnyRole, showAutoBillingModal]);
 
   // ========== RENDER LOGIC ==========
 
@@ -1503,23 +1778,6 @@ const FeeStructureManager = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* Auto-billing Modal */}
-      <AutoBillingModal
-        isOpen={showAutoBilling}
-        onClose={() => setShowAutoBilling(false)}
-        grades={grades}
-        terms={state.terms}
-        currentTermId={selectedTerm}
-        onAutoBillAll={handleAutoBillAllStudents}
-        onAutoBillByGrade={handleAutoBillByGrade}
-        loading={state.loadingStates.autoBilling}
-        // Controlled state
-        selectedGrade={autoBillingState.selectedGrade}
-        selectedTermId={autoBillingState.selectedTermId}
-        onGradeChange={handleAutoBillingGradeChange}
-        onTermChange={handleAutoBillingTermChange}
-      />
-      
       {/* Header */}
       <div className="mb-8">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-6">
@@ -1571,31 +1829,21 @@ const FeeStructureManager = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setEditingStructure(null);
-                  setShowForm(true);
-                  setFormData({
-                    termId: selectedTerm,
-                    grade: selectedGrade || '',
-                    tuitionFee: '',
-                    basicFee: '',
-                    examinationFee: '',
-                    transportFee: '',
-                    libraryFee: '',
-                    sportsFee: '',
-                    activityFee: '',
-                    hostelFee: '',
-                    uniformFee: '',
-                    bookFee: '',
-                    otherFees: '',
-                    isActive: true,
-                  });
-                  setFormErrors({});
-                }}
-                className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2.5 px-5 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200"
+                onClick={() => showFeeStructureForm()}
+                disabled={state.loadingStates.savingStructure}
+                className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-2.5 px-5 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
               >
-                <Plus className="w-5 h-5 mr-2" />
-                Create Fee Structure
+                {state.loadingStates.savingStructure ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5 mr-2" />
+                    Create Fee Structure
+                  </>
+                )}
               </motion.button>
             )}
           </div>
@@ -1688,459 +1936,6 @@ const FeeStructureManager = () => {
         </div>
       </div>
 
-      {/* Fee Form Modal */}
-      <AnimatePresence>
-        {showForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-100 p-4">
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto relative z-110"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    {editingStructure ? 'Edit Fee Structure' : 'Create Fee Structure'}
-                  </h2>
-                  <button
-                    onClick={() => {
-                      setShowForm(false);
-                      setEditingStructure(null);
-                      setFormErrors({});
-                    }}
-                    className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full"
-                    disabled={state.loadingStates.savingStructure}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Term Dropdown */}
-                    <CustomDropdown
-                      label="Term"
-                      name="termId"
-                      value={formData.termId}
-                      onChange={handleInputChange}
-                      options={state.terms.map(term => ({
-                        id: term.id,
-                        name: `${term.termName} ${term.academicYear}`
-                      }))}
-                      placeholder="Select Term"
-                      disabled={state.loadingStates.savingStructure || state.loadingStates.terms}
-                      loading={state.loadingStates.terms}
-                      loadingText="Loading terms..."
-                      error={formErrors.termId}
-                      required={true}
-                      valueKey="id"
-                      displayKey="name"
-                    />
-
-                    {/* Grade Dropdown */}
-                    <CustomDropdown
-                      label="Grade"
-                      name="grade"
-                      value={formData.grade}
-                      onChange={handleInputChange}
-                      options={grades.map(grade => ({
-                        id: grade,
-                        name: grade
-                      }))}
-                      placeholder="Select Grade"
-                      disabled={state.loadingStates.savingStructure || gradesLoading}
-                      loading={gradesLoading}
-                      loadingText="Loading grades..."
-                      error={formErrors.grade}
-                      required={true}
-                      valueKey="id"
-                      displayKey="name"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Basic Fees Card */}
-                    <div className="space-y-4 p-6 border rounded-xl bg-linear-to-br from-blue-50 to-blue-100 border-blue-200">
-                      <div className="flex items-center">
-                        <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                          <BookOpen className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <h3 className="font-semibold text-gray-900">Basic Fees</h3>
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Basic Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="basicFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.basicFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.basicFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.basicFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.basicFee}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Tuition Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="tuitionFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.tuitionFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.tuitionFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.tuitionFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.tuitionFee}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Examination Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="examinationFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.examinationFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.examinationFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.examinationFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.examinationFee}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Optional Fees Card */}
-                    <div className="space-y-4 p-6 border rounded-xl bg-linear-to-br from-green-50 to-green-100 border-green-200">
-                      <div className="flex items-center">
-                        <div className="p-2 bg-green-100 rounded-lg mr-3">
-                          <Trophy className="w-5 h-5 text-green-600" />
-                        </div>
-                        <h3 className="font-semibold text-gray-900">Optional Fees</h3>
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Transport Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="transportFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.transportFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-green-500 focus:ring-green-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.transportFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.transportFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.transportFee}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Library Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="libraryFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.libraryFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-green-500 focus:ring-green-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.libraryFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.libraryFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.libraryFee}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Sports Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="sportsFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.sportsFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-green-500 focus:ring-green-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.sportsFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.sportsFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.sportsFee}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Additional Fees Card */}
-                    <div className="space-y-4 p-6 border rounded-xl bg-linear-to-br from-purple-50 to-purple-100 border-purple-200">
-                      <div className="flex items-center">
-                        <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                          <Activity className="w-5 h-5 text-purple-600" />
-                        </div>
-                        <h3 className="font-semibold text-gray-900">Additional Fees</h3>
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Activity Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="activityFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.activityFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-purple-500 focus:ring-purple-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.activityFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.activityFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.activityFee}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Hostel Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="hostelFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.hostelFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-purple-500 focus:ring-purple-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.hostelFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.hostelFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.hostelFee}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-1">Uniform Fee</label>
-                          <div className="flex items-center">
-                            <input
-                              type="number"
-                              name="uniformFee"
-                              step="0.01"
-                              min="0"
-                              disabled={state.loadingStates.savingStructure}
-                              className={`flex-1 px-3 py-2 rounded-lg border ${
-                                formErrors.uniformFee 
-                                  ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                                  : 'border-gray-300 focus:border-purple-500 focus:ring-purple-500'
-                              } focus:ring-1 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                              value={formData.uniformFee}
-                              onChange={handleInputChange}
-                              placeholder="0"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">KES</span>
-                          </div>
-                          {formErrors.uniformFee && (
-                            <p className="text-xs text-red-600 mt-1">{formErrors.uniformFee}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Book Fee</label>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="bookFee"
-                          step="0.01"
-                          min="0"
-                          disabled={state.loadingStates.savingStructure}
-                          className={`flex-1 px-4 py-3 rounded-lg border ${
-                            formErrors.bookFee 
-                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                              : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
-                          } focus:ring-2 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                          value={formData.bookFee}
-                          onChange={handleInputChange}
-                          placeholder="0"
-                        />
-                        <span className="ml-3 text-gray-600">KES</span>
-                      </div>
-                      {formErrors.bookFee && (
-                        <p className="text-sm text-red-600 mt-1">{formErrors.bookFee}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Other Fees</label>
-                      <div className="flex items-center">
-                        <input
-                          type="number"
-                          name="otherFees"
-                          step="0.01"
-                          min="0"
-                          disabled={state.loadingStates.savingStructure}
-                          className={`flex-1 px-4 py-3 rounded-lg border ${
-                            formErrors.otherFees 
-                              ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-                              : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'
-                          } focus:ring-2 focus:ring-opacity-20 transition-all duration-200 disabled:bg-gray-50`}
-                          value={formData.otherFees}
-                          onChange={handleInputChange}
-                          placeholder="0"
-                        />
-                        <span className="ml-3 text-gray-600">KES</span>
-                      </div>
-                      {formErrors.otherFees && (
-                        <p className="text-sm text-red-600 mt-1">{formErrors.otherFees}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center pt-4">
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <div className="relative">
-                        <input
-                          type="checkbox"
-                          name="isActive"
-                          className="sr-only"
-                          disabled={state.loadingStates.savingStructure}
-                          checked={formData.isActive}
-                          onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
-                        />
-                        <div className={`w-12 h-6 rounded-full transition-all duration-200 ${
-                          formData.isActive ? 'bg-indigo-600' : 'bg-gray-300'
-                        }`}>
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all duration-200 ${
-                            formData.isActive ? 'left-7' : 'left-1'
-                          }`}></div>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium text-gray-700">Active Fee Structure</span>
-                    </label>
-                  </div>
-
-                  <div className="border-t border-gray-100 pt-6">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-gray-600">Total Fee Structure</p>
-                        <div className="text-3xl font-bold text-indigo-600">
-                          KES {totalAmount.toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="flex space-x-3">
-                        <motion.button
-                          type="button"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            setShowForm(false);
-                            setEditingStructure(null);
-                            setFormErrors({});
-                          }}
-                          disabled={state.loadingStates.savingStructure}
-                          className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 font-medium transition-colors duration-200 disabled:opacity-50"
-                        >
-                          <X className="w-4 h-4 mr-2 inline" />
-                          Cancel
-                        </motion.button>
-                        <motion.button
-                          type="submit"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          disabled={state.loadingStates.savingStructure}
-                          className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-medium py-3 px-8 rounded-xl flex items-center shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
-                        >
-                          {state.loadingStates.savingStructure ? (
-                            <>
-                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-5 h-5 mr-2" />
-                              {editingStructure ? 'Update Fee Structure' : 'Save Fee Structure'}
-                            </>
-                          )}
-                        </motion.button>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Fee Structures List */}
       <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
         <div className="p-6 border-b border-gray-100">
@@ -2166,7 +1961,7 @@ const FeeStructureManager = () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={handleOpenAutoBilling}
+                  onClick={showAutoBillingModal}
                   className="flex items-center gap-2 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-medium py-2.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <Zap className="w-4 h-4" />
@@ -2211,14 +2006,14 @@ const FeeStructureManager = () => {
               {(isAdmin || isAccountant || hasRole('ADMIN') || hasRole('ACCOUNTANT')) && (
                 <div className="flex gap-3 justify-center">
                   <button
-                    onClick={() => setShowForm(true)}
+                    onClick={() => showFeeStructureForm()}
                     className="text-indigo-600 hover:text-indigo-800 font-medium"
                   >
                     Create your first fee structure
                   </button>
                   <span className="text-gray-400">|</span>
                   <button
-                    onClick={handleOpenAutoBilling}
+                    onClick={showAutoBillingModal}
                     className="text-amber-600 hover:text-amber-800 font-medium"
                   >
                     Start auto-billing
@@ -2326,7 +2121,7 @@ const FeeStructureManager = () => {
                                 <motion.button
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
-                                  onClick={() => handleEdit(structure)}
+                                  onClick={() => showFeeStructureForm(structure)}
                                   className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center px-3 py-2 hover:bg-indigo-50 rounded-lg transition-colors"
                                 >
                                   <Edit2 className="w-4 h-4 mr-1.5" />
@@ -2336,12 +2131,11 @@ const FeeStructureManager = () => {
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
                                   onClick={() => {
-                                    // Quick auto-bill for this grade
                                     setAutoBillingState({
                                       selectedGrade: structure.grade,
                                       selectedTermId: structure.academicTerm?.id || structure.termId || selectedTerm
                                     });
-                                    setShowAutoBilling(true);
+                                    showAutoBillingModal();
                                   }}
                                   className="text-amber-600 hover:text-amber-800 text-sm font-medium flex items-center px-3 py-2 hover:bg-amber-50 rounded-lg transition-colors"
                                 >

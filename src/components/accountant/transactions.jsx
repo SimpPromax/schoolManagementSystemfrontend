@@ -768,7 +768,7 @@ const ImportModal = ({ isOpen, onClose, onUpload, isLoading }) => {
                     <li>• Ensure file has columns: Date, Description, Amount, Reference</li>
                     <li>• Remove any header rows or footers from the statement</li>
                     <li>• Date format should be YYYY-MM-DD or DD/MM/YYYY</li>
-                    <li>• Amount should be numeric (₹ symbol will be removed)</li>
+                    <li>• Amount should be numeric (KES symbol will be removed)</li>
                   </ul>
                 </div>
               </div>
@@ -913,91 +913,87 @@ const Transactions = () => {
     }
   };
 
-  // ============================================
   // UPDATED FETCH FUNCTION WITH DATA TRANSFORMATION
-  // ============================================
-// 🔧 UPDATED: Enhanced fetch function with data transformation
-const fetchAllData = useCallback(async (refreshCache = false) => {
-  setIsLoading(true);
-  
-  try {
-    // Step 1: Refresh backend cache if requested
-    if (refreshCache) {
-      await refreshBackendCache();
-    }
+  const fetchAllData = useCallback(async (refreshCache = false) => {
+    setIsLoading(true);
     
-    // Step 2: Fetch statistics FIRST
-    await fetchStatistics();
-    
-    // Step 3: Fetch ALL bank transactions and TRANSFORM the data
     try {
-      const bankResponse = await transactionApi.get('/bank?all=true');
-      const allBankData = handleResponse(bankResponse);
-      
-      console.log('🔍 Raw API response (first transaction):', allBankData[0]);
-      
-      // TRANSFORM THE DATA: Convert flat fields to nested structure
-      const transformedBankData = transformTransactionResponse(allBankData);
-      
-      console.log('✅ Transformed data (first transaction):', transformedBankData[0]);
-      console.log(`✅ Loaded ${transformedBankData.length} bank transactions`);
-      
-      setBankStatements(transformedBankData);
-      setCurrentPage(1);
-      
-    } catch (bankError) {
-      console.error('Error fetching bank transactions:', bankError);
-      showAlert('warning', 'Bank transactions', 'Could not load bank transactions');
-      
-      // Fallback
-      try {
-        const fallbackResponse = await transactionApi.get('/bank?page=0&size=1000');
-        const fallbackData = handleResponse(fallbackResponse);
-        const transformedData = transformTransactionResponse(fallbackData.content || []);
-        setBankStatements(transformedData);
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
+      // Step 1: Refresh backend cache if requested
+      if (refreshCache) {
+        await refreshBackendCache();
       }
-    }
-
-    // Step 4: Fetch ALL students and transform the data
-    try {
-      const studentsResponse = await axios.get('http://localhost:8080/api/v1/students', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const studentsData = studentsResponse.data;
       
-      // Transform student data
-      const formattedStudents = transformStudentResponse(
-        Array.isArray(studentsData) ? studentsData : []
-      );
+      // Step 2: Fetch statistics FIRST
+      await fetchStatistics();
+      
+      // Step 3: Fetch ALL bank transactions and TRANSFORM the data
+      try {
+        const bankResponse = await transactionApi.get('/bank?all=true');
+        const allBankData = handleResponse(bankResponse);
+        
+        console.log('🔍 Raw API response (first transaction):', allBankData[0]);
+        
+        // TRANSFORM THE DATA: Convert flat fields to nested structure
+        const transformedBankData = transformTransactionResponse(allBankData);
+        
+        console.log('✅ Transformed data (first transaction):', transformedBankData[0]);
+        console.log(`✅ Loaded ${transformedBankData.length} bank transactions`);
+        
+        setBankStatements(transformedBankData);
+        setCurrentPage(1);
+        
+      } catch (bankError) {
+        console.error('Error fetching bank transactions:', bankError);
+        showAlert('warning', 'Bank transactions', 'Could not load bank transactions');
+        
+        // Fallback
+        try {
+          const fallbackResponse = await transactionApi.get('/bank?page=0&size=1000');
+          const fallbackData = handleResponse(fallbackResponse);
+          const transformedData = transformTransactionResponse(fallbackData.content || []);
+          setBankStatements(transformedData);
+        } catch (fallbackError) {
+          console.error('Fallback also failed:', fallbackError);
+        }
+      }
 
-      setStudents(formattedStudents);
-      console.log(`✅ Loaded ${formattedStudents.length} students`);
+      // Step 4: Fetch ALL students and transform the data
+      try {
+        const studentsResponse = await axios.get('http://localhost:8080/api/v1/students', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        const studentsData = studentsResponse.data;
+        
+        // Transform student data
+        const formattedStudents = transformStudentResponse(
+          Array.isArray(studentsData) ? studentsData : []
+        );
 
-    } catch (studentError) {
-      console.error('Error fetching students:', studentError);
-      showAlert('warning', 'Student Data', 'Could not load student information');
+        setStudents(formattedStudents);
+        console.log(`✅ Loaded ${formattedStudents.length} students`);
+
+      } catch (studentError) {
+        console.error('Error fetching students:', studentError);
+        showAlert('warning', 'Student Data', 'Could not load student information');
+      }
+      
+      // Step 5: Show success message
+      if (refreshCache) {
+        showSuccessAlert(
+          'Data Refreshed!',
+          'Successfully refreshed transactions and students from backend.'
+        );
+      }
+      
+    } catch (error) {
+      console.error('General error fetching data:', error);
+      showAlert('error', 'Data Load Error', error.message);
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Step 5: Show success message
-    // Remove the reference to bankStatements.length and students.length here
-    if (refreshCache) {
-      showSuccessAlert(
-        'Data Refreshed!',
-        'Successfully refreshed transactions and students from backend.'
-      );
-    }
-    
-  } catch (error) {
-    console.error('General error fetching data:', error);
-    showAlert('error', 'Data Load Error', error.message);
-  } finally {
-    setIsLoading(false);
-  }
-}, [showAlert]); // ✅ Removed unnecessary dependencies
+  }, [showAlert]);
 
   // Initial data fetch
   useEffect(() => {
@@ -1098,367 +1094,367 @@ const fetchAllData = useCallback(async (refreshCache = false) => {
   };
 
   // View term assignments for a student
-const handleViewTermAssignments = async (student) => {
-  if (!student) return;
-  
-  console.log('📘 Viewing term assignments for student:', student);
-  
-  setIsLoading(true);
-  
-  try {
-    // ONLY fetch term assignments data
-    console.log('📞 Calling term assignments API for student ID:', student.id);
+  const handleViewTermAssignments = async (student) => {
+    if (!student) return;
     
-    const response = await feeManagementApi.get(`/student/${student.id}/term-assignments`);
-    const data = handleResponse(response);
+    console.log('📘 Viewing term assignments for student:', student);
     
-    console.log('✅ Term assignments API response:', data);
+    setIsLoading(true);
     
-    // Extract term assignments from the response
-    let termAssignments = [];
-    
-    // Handle different response formats
-    if (data && data.data && Array.isArray(data.data.termAssignments)) {
-      termAssignments = data.data.termAssignments;
-      console.log('📊 Got term assignments from data.data.termAssignments:', termAssignments.length);
-    } else if (Array.isArray(data)) {
-      termAssignments = data;
-      console.log('📊 Got term assignments from array response:', termAssignments.length);
-    } else if (data && Array.isArray(data.termAssignments)) {
-      termAssignments = data.termAssignments;
-      console.log('📊 Got term assignments from data.termAssignments:', termAssignments.length);
-    } else {
-      console.log('⚠️ No term assignments found in response structure:', data);
-    }
-    
-    // Calculate totals from term assignments
-    const totalTermFee = termAssignments.reduce((sum, term) => sum + (Number(term.totalFee) || 0), 0);
-    const totalTermPaid = termAssignments.reduce((sum, term) => sum + (Number(term.paidAmount) || 0), 0);
-    const totalTermPending = termAssignments.reduce((sum, term) => sum + (Number(term.pendingAmount) || 0), 0);
-    
-    // Use student data as fallback
-    const hasTermAssignments = termAssignments.length > 0;
-    const termAssignmentCount = termAssignments.length;
-    
-    const formatCurrency = (amount) => {
-      const numAmount = Number(amount) || 0;
-      return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        minimumFractionDigits: 2
-      }).format(numAmount);
-    };
+    try {
+      // ONLY fetch term assignments data
+      console.log('📞 Calling term assignments API for student ID:', student.id);
+      
+      const response = await feeManagementApi.get(`/student/${student.id}/term-assignments`);
+      const data = handleResponse(response);
+      
+      console.log('✅ Term assignments API response:', data);
+      
+      // Extract term assignments from the response
+      let termAssignments = [];
+      
+      // Handle different response formats
+      if (data && data.data && Array.isArray(data.data.termAssignments)) {
+        termAssignments = data.data.termAssignments;
+        console.log('📊 Got term assignments from data.data.termAssignments:', termAssignments.length);
+      } else if (Array.isArray(data)) {
+        termAssignments = data;
+        console.log('📊 Got term assignments from array response:', termAssignments.length);
+      } else if (data && Array.isArray(data.termAssignments)) {
+        termAssignments = data.termAssignments;
+        console.log('📊 Got term assignments from data.termAssignments:', termAssignments.length);
+      } else {
+        console.log('⚠️ No term assignments found in response structure:', data);
+      }
+      
+      // Calculate totals from term assignments
+      const totalTermFee = termAssignments.reduce((sum, term) => sum + (Number(term.totalFee) || 0), 0);
+      const totalTermPaid = termAssignments.reduce((sum, term) => sum + (Number(term.paidAmount) || 0), 0);
+      const totalTermPending = termAssignments.reduce((sum, term) => sum + (Number(term.pendingAmount) || 0), 0);
+      
+      // Use student data as fallback
+      const hasTermAssignments = termAssignments.length > 0;
+      const termAssignmentCount = termAssignments.length;
+      
+      const formatCurrency = (amount) => {
+        const numAmount = Number(amount) || 0;
+        return new Intl.NumberFormat('en-KE', {
+          style: 'currency',
+          currency: 'KES',
+          minimumFractionDigits: 2
+        }).format(numAmount);
+      };
 
-    // Show as SweetAlert2 popup
-    MySwal.fire({
-      title: <span className="text-gray-900">Term Assignments - {student.fullName}</span>,
-      html: (
-        <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
-          {/* Student Information */}
-          <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <GraduationCap className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-bold text-lg text-gray-900">Student Information</h3>
+      // Show as SweetAlert2 popup
+      MySwal.fire({
+        title: <span className="text-gray-900">Term Assignments - {student.fullName}</span>,
+        html: (
+          <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Student Information */}
+            <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-blue-600" />
+                    <h3 className="font-bold text-lg text-gray-900">Student Information</h3>
+                  </div>
+                  <p className="text-sm text-gray-600">{student.grade} • ID: {student.studentId}</p>
                 </div>
-                <p className="text-sm text-gray-600">{student.grade} • ID: {student.studentId}</p>
-              </div>
-              <div className={`px-3 py-1.5 rounded-lg ${
-                hasTermAssignments 
-                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                  : 'bg-amber-50 text-amber-800 border border-amber-200'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {hasTermAssignments ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4" />
-                  )}
-                  <span className="text-sm font-medium">
-                    {hasTermAssignments ? 'Has Term Assignments' : 'No Term Assignments'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Total Terms</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {termAssignmentCount}
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Total Fee</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {formatCurrency(student.totalFee || totalTermFee || 0)}
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Paid Amount</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {formatCurrency(student.paidAmount || totalTermPaid || 0)}
-                </p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">Pending</p>
-                <p className="text-lg font-bold text-amber-600">
-                  {formatCurrency(student.pendingAmount || totalTermPending || 0)}
-                </p>
-              </div>
-            </div>
-
-            {!hasTermAssignments && (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
-                  <div className="flex-1">
-                    <h4 className="text-sm font-semibold text-amber-800">No Term Assignments</h4>
-                    <p className="text-xs text-amber-700 mt-1">
-                      This student has not been assigned to any academic terms.
-                    </p>
-                    <div className="mt-2 text-xs text-amber-700">
-                      <p className="font-medium">Required Action:</p>
-                      <p className="mt-1">Please assign this student to academic terms in the Term Management section.</p>
-                    </div>
+                <div className={`px-3 py-1.5 rounded-lg ${
+                  hasTermAssignments 
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {hasTermAssignments ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {hasTermAssignments ? 'Has Term Assignments' : 'No Term Assignments'}
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Term Assignments List */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-gray-700" />
-                <h3 className="font-semibold text-gray-900">Term-wise Fee Breakdown</h3>
-              </div>
-              <span className="text-sm text-gray-500">
-                {termAssignmentCount} term(s) assigned
-              </span>
-            </div>
-
-            {!hasTermAssignments ? (
-              <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
-                <Book className="w-12 h-12 text-gray-400 mx-auto" />
-                <h4 className="mt-4 text-lg font-semibold text-gray-900">No Term Assignments Found</h4>
-                <p className="text-gray-600 mt-2">
-                  This student has not been assigned to any academic terms.
-                </p>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 max-w-md mx-auto">
-                  <p className="text-sm text-blue-800 font-medium">Next Steps:</p>
-                  <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                    <li>• Navigate to Term Management section</li>
-                    <li>• Assign student to current academic term</li>
-                    <li>• Configure term fees and due dates</li>
-                    <li>• Refresh student data after assignment</li>
-                  </ul>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Total Terms</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {termAssignmentCount}
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Total Fee</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {formatCurrency(student.totalFee || totalTermFee || 0)}
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Paid Amount</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {formatCurrency(student.paidAmount || totalTermPaid || 0)}
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500">Pending</p>
+                  <p className="text-lg font-bold text-amber-600">
+                    {formatCurrency(student.pendingAmount || totalTermPending || 0)}
+                  </p>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {termAssignments.map((term, index) => (
-                  <div
-                    key={index}
-                    className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <School className="w-4 h-4 text-blue-600" />
-                          <h4 className="font-medium text-gray-900">
-                            {term.termName || `Term ${index + 1}`}
-                          </h4>
-                        </div>
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <div>
-                            <p className="text-xs text-gray-500">Total Fee</p>
-                            <p className="text-sm font-bold text-gray-900">
-                              {formatCurrency(term.totalFee || 0)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Paid Amount</p>
-                            <p className="text-sm font-bold text-emerald-600">
-                              {formatCurrency(term.paidAmount || 0)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Pending</p>
-                            <p className="text-sm font-bold text-amber-600">
-                              {formatCurrency(term.pendingAmount || 0)}
-                            </p>
-                          </div>
-                        </div>
+              {!hasTermAssignments && (
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-amber-800">No Term Assignments</h4>
+                      <p className="text-xs text-amber-700 mt-1">
+                        This student has not been assigned to any academic terms.
+                      </p>
+                      <div className="mt-2 text-xs text-amber-700">
+                        <p className="font-medium">Required Action:</p>
+                        <p className="mt-1">Please assign this student to academic terms in the Term Management section.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-                        {/* Progress Bar */}
-                        <div className="mt-3">
-                          <div className="flex justify-between text-xs text-gray-600 mb-1">
-                            <span>Payment Progress</span>
-                            <span className="font-medium">
-                              {term.totalFee > 0 
-                                ? `${Math.round(((term.paidAmount || 0) / (term.totalFee || 1)) * 100)}%`
-                                : '0%'
-                              }
-                            </span>
+            {/* Term Assignments List */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-gray-700" />
+                  <h3 className="font-semibold text-gray-900">Term-wise Fee Breakdown</h3>
+                </div>
+                <span className="text-sm text-gray-500">
+                  {termAssignmentCount} term(s) assigned
+                </span>
+              </div>
+
+              {!hasTermAssignments ? (
+                <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
+                  <Book className="w-12 h-12 text-gray-400 mx-auto" />
+                  <h4 className="mt-4 text-lg font-semibold text-gray-900">No Term Assignments Found</h4>
+                  <p className="text-gray-600 mt-2">
+                    This student has not been assigned to any academic terms.
+                  </p>
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 max-w-md mx-auto">
+                    <p className="text-sm text-blue-800 font-medium">Next Steps:</p>
+                    <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                      <li>• Navigate to Term Management section</li>
+                      <li>• Assign student to current academic term</li>
+                      <li>• Configure term fees and due dates</li>
+                      <li>• Refresh student data after assignment</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {termAssignments.map((term, index) => (
+                    <div
+                      key={index}
+                      className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <School className="w-4 h-4 text-blue-600" />
+                            <h4 className="font-medium text-gray-900">
+                              {term.termName || `Term ${index + 1}`}
+                            </h4>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="h-2 bg-linear-to-r from-blue-500 to-emerald-500 rounded-full"
-                              style={{
-                                width: `${term.totalFee > 0 
-                                  ? Math.min(100, ((term.paidAmount || 0) / (term.totalFee || 1)) * 100)
-                                  : 0}%`
-                              }}
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Show fee items if available */}
-                        {term.feeItems && term.feeItems.length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-xs font-medium text-gray-700 mb-1">Fee Breakdown:</p>
-                            <div className="grid grid-cols-2 gap-2">
-                              {term.feeBreakdown && (
-                                <>
-                                  {term.feeBreakdown.tuitionFee > 0 && (
-                                    <div className="text-xs">
-                                      <span className="text-gray-600">Tuition: </span>
-                                      <span className="font-medium">{formatCurrency(term.feeBreakdown.tuitionFee)}</span>
-                                    </div>
-                                  )}
-                                  {term.feeBreakdown.examinationFee > 0 && (
-                                    <div className="text-xs">
-                                      <span className="text-gray-600">Examination: </span>
-                                      <span className="font-medium">{formatCurrency(term.feeBreakdown.examinationFee)}</span>
-                                    </div>
-                                  )}
-                                  {term.feeBreakdown.otherFees > 0 && (
-                                    <div className="text-xs">
-                                      <span className="text-gray-600">Other Fees: </span>
-                                      <span className="font-medium">{formatCurrency(term.feeBreakdown.otherFees)}</span>
-                                    </div>
-                                  )}
-                                </>
-                              )}
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <p className="text-xs text-gray-500">Total Fee</p>
+                              <p className="text-sm font-bold text-gray-900">
+                                {formatCurrency(term.totalFee || 0)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Paid Amount</p>
+                              <p className="text-sm font-bold text-emerald-600">
+                                {formatCurrency(term.paidAmount || 0)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Pending</p>
+                              <p className="text-sm font-bold text-amber-600">
+                                {formatCurrency(term.pendingAmount || 0)}
+                              </p>
                             </div>
                           </div>
-                        )}
-                      </div>
 
-                      <div className="ml-3">
-                        <TermStatusBadge status={term.status || 'UNASSIGNED'} />
+                          {/* Progress Bar */}
+                          <div className="mt-3">
+                            <div className="flex justify-between text-xs text-gray-600 mb-1">
+                              <span>Payment Progress</span>
+                              <span className="font-medium">
+                                {term.totalFee > 0 
+                                  ? `${Math.round(((term.paidAmount || 0) / (term.totalFee || 1)) * 100)}%`
+                                  : '0%'
+                                }
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="h-2 bg-linear-to-r from-blue-500 to-emerald-500 rounded-full"
+                                style={{
+                                  width: `${term.totalFee > 0 
+                                    ? Math.min(100, ((term.paidAmount || 0) / (term.totalFee || 1)) * 100)
+                                    : 0}%`
+                                }}
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Show fee items if available */}
+                          {term.feeItems && term.feeItems.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Fee Breakdown:</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {term.feeBreakdown && (
+                                  <>
+                                    {term.feeBreakdown.tuitionFee > 0 && (
+                                      <div className="text-xs">
+                                        <span className="text-gray-600">Tuition: </span>
+                                        <span className="font-medium">{formatCurrency(term.feeBreakdown.tuitionFee)}</span>
+                                      </div>
+                                    )}
+                                    {term.feeBreakdown.examinationFee > 0 && (
+                                      <div className="text-xs">
+                                        <span className="text-gray-600">Examination: </span>
+                                        <span className="font-medium">{formatCurrency(term.feeBreakdown.examinationFee)}</span>
+                                      </div>
+                                    )}
+                                    {term.feeBreakdown.otherFees > 0 && (
+                                      <div className="text-xs">
+                                        <span className="text-gray-600">Other Fees: </span>
+                                        <span className="font-medium">{formatCurrency(term.feeBreakdown.otherFees)}</span>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="ml-3">
+                          <TermStatusBadge status={term.status || 'UNASSIGNED'} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Summary */}
-          <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-            <h4 className="font-semibold text-gray-900 mb-3">Payment Summary</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">Total Terms</p>
-                <p className="text-lg font-bold text-gray-900">{termAssignmentCount}</p>
+            {/* Summary */}
+            <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-gray-900 mb-3">Payment Summary</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 bg-white rounded-lg">
+                  <p className="text-xs text-gray-500">Total Terms</p>
+                  <p className="text-lg font-bold text-gray-900">{termAssignmentCount}</p>
+                </div>
+                <div className="p-3 bg-white rounded-lg">
+                  <p className="text-xs text-gray-500">Total Fee</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {formatCurrency(totalTermFee || student.totalFee || 0)}
+                  </p>
+                </div>
+                <div className="p-3 bg-white rounded-lg">
+                  <p className="text-xs text-gray-500">Total Paid</p>
+                  <p className="text-lg font-bold text-emerald-600">
+                    {formatCurrency(totalTermPaid || student.paidAmount || 0)}
+                  </p>
+                </div>
+                <div className="p-3 bg-white rounded-lg">
+                  <p className="text-xs text-gray-500">Total Pending</p>
+                  <p className="text-lg font-bold text-amber-600">
+                    {formatCurrency(totalTermPending || student.pendingAmount || 0)}
+                  </p>
+                </div>
               </div>
-              <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">Total Fee</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {formatCurrency(totalTermFee || student.totalFee || 0)}
-                </p>
-              </div>
-              <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">Total Paid</p>
-                <p className="text-lg font-bold text-emerald-600">
-                  {formatCurrency(totalTermPaid || student.paidAmount || 0)}
-                </p>
-              </div>
-              <div className="p-3 bg-white rounded-lg">
-                <p className="text-xs text-gray-500">Total Pending</p>
-                <p className="text-lg font-bold text-amber-600">
-                  {formatCurrency(totalTermPending || student.pendingAmount || 0)}
-                </p>
-              </div>
-            </div>
-            
-            {!hasTermAssignments && (
-              <div className="mt-3 p-2 bg-amber-50 rounded border border-amber-200">
-                <p className="text-xs text-amber-700 font-medium">
-                  ℹ️ No term assignments found. Using student-level fee data.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      ),
-      width: 700,
-      showConfirmButton: false,
-      showCloseButton: true,
-      customClass: {
-        popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold mb-4'
-      }
-    });
-    
-  } catch (error) {
-    console.error('❌ Error in handleViewTermAssignments:', error);
-    
-    // Show user-friendly error message
-    MySwal.fire({
-      title: <span className="text-amber-600">Term Assignments</span>,
-      html: (
-        <div className="text-center py-4">
-          <Book className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Term Data</h4>
-          <p className="text-gray-600 mb-4">
-            {error.message || 'Could not retrieve term assignment information.'}
-          </p>
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 max-w-md mx-auto">
-            <p className="text-sm font-medium text-gray-900">Student Information:</p>
-            <p className="text-sm text-gray-700">{student.fullName} • {student.grade}</p>
-            <p className="text-xs text-gray-500 mt-1">Student ID: {student.studentId}</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Total Fee</p>
-                <p className="font-bold">₹{student.totalFee?.toLocaleString() || '0'}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500">Pending</p>
-                <p className="font-bold text-amber-600">₹{student.pendingAmount?.toLocaleString() || '0'}</p>
-              </div>
+              
+              {!hasTermAssignments && (
+                <div className="mt-3 p-2 bg-amber-50 rounded border border-amber-200">
+                  <p className="text-xs text-amber-700 font-medium">
+                    ℹ️ No term assignments found. Using student-level fee data.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm font-medium text-blue-800">Troubleshooting:</p>
-            <ul className="text-xs text-blue-700 mt-1 space-y-1">
-              <li>• Check if the student exists in the system</li>
-              <li>• Verify term management service is running</li>
-              <li>• Ensure student has active enrollment status</li>
-            </ul>
+        ),
+        width: 700,
+        showConfirmButton: false,
+        showCloseButton: true,
+        customClass: {
+          popup: 'rounded-2xl border border-gray-200 shadow-xl',
+          title: 'text-lg font-bold mb-4'
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error in handleViewTermAssignments:', error);
+      
+      // Show user-friendly error message
+      MySwal.fire({
+        title: <span className="text-amber-600">Term Assignments</span>,
+        html: (
+          <div className="text-center py-4">
+            <Book className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <h4 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Term Data</h4>
+            <p className="text-gray-600 mb-4">
+              {error.message || 'Could not retrieve term assignment information.'}
+            </p>
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 max-w-md mx-auto">
+              <p className="text-sm font-medium text-gray-900">Student Information:</p>
+              <p className="text-sm text-gray-700">{student.fullName} • {student.grade}</p>
+              <p className="text-xs text-gray-500 mt-1">Student ID: {student.studentId}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Total Fee</p>
+                  <p className="font-bold">KSh {student.totalFee?.toLocaleString('en-KE') || '0'}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Pending</p>
+                  <p className="font-bold text-amber-600">KSh {student.pendingAmount?.toLocaleString('en-KE') || '0'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm font-medium text-blue-800">Troubleshooting:</p>
+              <ul className="text-xs text-blue-700 mt-1 space-y-1">
+                <li>• Check if the student exists in the system</li>
+                <li>• Verify term management service is running</li>
+                <li>• Ensure student has active enrollment status</li>
+              </ul>
+            </div>
           </div>
-        </div>
-      ),
-      width: 500,
-      showConfirmButton: true,
-      confirmButtonText: 'OK',
-      confirmButtonColor: '#3b82f6',
-      showCloseButton: true,
-      customClass: {
-        popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold mb-4',
-        confirmButton: 'px-4 py-2 rounded-lg font-medium'
-      }
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
+        ),
+        width: 500,
+        showConfirmButton: true,
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#3b82f6',
+        showCloseButton: true,
+        customClass: {
+          popup: 'rounded-2xl border border-gray-200 shadow-xl',
+          title: 'text-lg font-bold mb-4',
+          confirmButton: 'px-4 py-2 rounded-lg font-medium'
+        }
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Bulk validate students
   const handleBulkValidate = async () => {
@@ -1508,7 +1504,7 @@ const handleViewTermAssignments = async (student) => {
           {validCount > 0 && (
             <div className="p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800 font-medium">
-                Total Pending Amount: ₹{totalPendingAmount.toLocaleString()}
+                Total Pending Amount: KSh {totalPendingAmount.toLocaleString('en-KE')}
               </p>
             </div>
           )}
@@ -1565,7 +1561,7 @@ const handleViewTermAssignments = async (student) => {
       if (result.isConfirmed && validCount > 0) {
         showSuccessAlert(
           'Validation Complete',
-          `Ready to process payments for ${validCount} valid student(s). Total pending amount: ₹${totalPendingAmount.toLocaleString()}`
+          `Ready to process payments for ${validCount} valid student(s). Total pending amount: KSh ${totalPendingAmount.toLocaleString('en-KE')}`
         );
       }
 
@@ -1653,7 +1649,7 @@ const handleViewTermAssignments = async (student) => {
               </div>
               <div className="text-right">
                 <p className="text-lg font-bold text-emerald-600">
-                  ₹{bankTransaction?.amount?.toLocaleString() || '0'}
+                  KSh {bankTransaction?.amount?.toLocaleString('en-KE') || '0'}
                 </p>
                 <TransactionStatusBadge status={bankTransaction?.status || 'UNVERIFIED'} />
               </div>
@@ -1747,7 +1743,7 @@ const handleViewTermAssignments = async (student) => {
                     {student.hasTermAssignments ? 
                       `✅ ${student.termAssignmentCount} term(s)` : 
                       '❌ No term assignments'} - 
-                    Pending: ₹{student.pendingAmount.toLocaleString()}
+                    Pending: KSh {student.pendingAmount.toLocaleString('en-KE')}
                   </option>
                 ))}
               </select>
@@ -1796,7 +1792,7 @@ const handleViewTermAssignments = async (student) => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Amount (₹)
+                  Amount (KSh)
                 </label>
                 <input
                   type="number"
@@ -1882,7 +1878,7 @@ const handleViewTermAssignments = async (student) => {
               <div id="smsPreview" className="mt-3 p-2 bg-white rounded border border-gray-300 text-sm">
                 <p className="text-gray-600">SMS Preview:</p>
                 <p className="font-medium mt-1">
-                  Dear Parent, payment of ₹{bankTransaction?.amount?.toLocaleString() || '0'} received for {bankTransaction?.student?.fullName || 'Student'}. Thank you!
+                  Dear Parent, payment of KSh {bankTransaction?.amount?.toLocaleString('en-KE') || '0'} received for {bankTransaction?.student?.fullName || 'Student'}. Thank you!
                 </p>
               </div>
               <div className="mt-2 text-xs text-gray-500">
@@ -1901,7 +1897,7 @@ const handleViewTermAssignments = async (student) => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Amount</span>
-                <span className="font-medium">₹{bankTransaction?.amount?.toLocaleString() || '0'}</span>
+                <span className="font-medium">KSh {bankTransaction?.amount?.toLocaleString('en-KE') || '0'}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">SMS Notification</span>
@@ -2031,7 +2027,7 @@ const handleViewTermAssignments = async (student) => {
         
         showSuccessAlert(
           'Payment Verified Successfully!',
-          `Payment of ₹${formValues.amount.toLocaleString()} verified for ${formValues.studentName}. ${
+          `Payment of KSh ${formValues.amount.toLocaleString('en-KE')} verified for ${formValues.studentName}. ${
             formValues.sendSMS ? 'SMS confirmation sent to parent.' : ''
           }`
         );
@@ -2091,7 +2087,7 @@ const handleViewTermAssignments = async (student) => {
 
       const smsRequest = {
         studentId: student.id,
-        message: `Dear Parent/Guardian, payment of ₹${amount.toLocaleString()} received for ${studentName} (${student.grade}). Thank you! - School Management System`,
+        message: `Dear Parent/Guardian, payment of KSh ${amount.toLocaleString('en-KE')} received for ${studentName} (${student.grade}). Thank you! - School Management System`,
         recipientPhone: recipient
       };
 
@@ -2152,7 +2148,7 @@ const handleViewTermAssignments = async (student) => {
             </div>
             <div>
               <p className="text-xs text-gray-500">Amount</p>
-              <p className="text-xl font-bold text-gray-900">₹{transaction.amount?.toLocaleString() || '0'}</p>
+              <p className="text-xl font-bold text-gray-900">KSh {transaction.amount?.toLocaleString('en-KE') || '0'}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500">Payment Method</p>
@@ -2243,7 +2239,7 @@ const handleViewTermAssignments = async (student) => {
               {student.pendingAmount > 0 && (
                 <div className="mt-3 p-2 bg-amber-50 rounded border border-amber-200">
                   <p className="text-xs font-medium text-amber-800">Pending Amount</p>
-                  <p className="text-lg font-bold text-amber-900">₹{student.pendingAmount.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-amber-900">KSh {student.pendingAmount.toLocaleString('en-KE')}</p>
                 </div>
               )}
             </div>
@@ -2456,16 +2452,16 @@ const handleViewTermAssignments = async (student) => {
     }
   };
 
-  // Format amount for display
+  // Format amount for display using Kenyan Shillings
   const formatAmount = (amount) => {
-    if (!amount && amount !== 0) return '₹0';
+    if (!amount && amount !== 0) return 'KSh 0';
     
     if (amount >= 1000000) {
-      return `₹${(amount / 1000000).toFixed(2)}M`;
+      return `KSh ${(amount / 1000000).toFixed(2)}M`;
     } else if (amount >= 1000) {
-      return `₹${(amount / 1000).toFixed(1)}K`;
+      return `KSh ${(amount / 1000).toFixed(1)}K`;
     } else {
-      return `₹${amount.toLocaleString()}`;
+      return `KSh ${amount.toLocaleString('en-KE')}`;
     }
   };
 
@@ -2723,10 +2719,10 @@ const handleViewTermAssignments = async (student) => {
                     </span>
                   </div>
                   <span className="text-sm text-blue-700">
-                    Total amount: ₹{bankStatements
+                    Total amount: KSh {bankStatements
                       .filter(stmt => selectedTransactions.includes(stmt.id))
                       .reduce((sum, stmt) => sum + (stmt.amount || 0), 0)
-                      .toLocaleString()}
+                      .toLocaleString('en-KE')}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2846,7 +2842,7 @@ const handleViewTermAssignments = async (student) => {
                                     <Calendar className="w-3 h-3" />
                                     <span>
                                       {transaction.transactionDate 
-                                        ? new Date(transaction.transactionDate).toLocaleDateString('en-IN', {
+                                        ? new Date(transaction.transactionDate).toLocaleDateString('en-KE', {
                                             day: '2-digit',
                                             month: 'short',
                                             year: 'numeric'
@@ -2897,7 +2893,7 @@ const handleViewTermAssignments = async (student) => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="space-y-2">
-                            <p className="text-lg font-bold text-gray-900">₹{transaction.amount?.toLocaleString() || '0'}</p>
+                            <p className="text-lg font-bold text-gray-900">KSh {transaction.amount?.toLocaleString('en-KE') || '0'}</p>
                             <div className="mt-1">
                               <PaymentMethodBadge
                                 method={transaction.paymentMethod || getPaymentMethodFromBankTransaction(transaction.description)}
@@ -2945,7 +2941,7 @@ const handleViewTermAssignments = async (student) => {
                               <p className="text-xs text-gray-500 truncate">{student.phone || student.contact || 'No phone'}</p>
                               {student.pendingAmount > 0 && (
                                 <p className="text-xs text-amber-600 mt-2 font-medium">
-                                  Pending: ₹{student.pendingAmount.toLocaleString()}
+                                  Pending: KSh {student.pendingAmount.toLocaleString('en-KE')}
                                 </p>
                               )}
                             </div>
