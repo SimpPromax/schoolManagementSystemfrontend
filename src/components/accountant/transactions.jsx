@@ -75,7 +75,15 @@ import {
   GraduationCap,
   ClipboardCheck,
   ClipboardList,
-  AlertOctagon
+  AlertOctagon,
+  Zap,
+  Shield,
+  Activity,
+  PlayCircle,
+  FileX,
+  UploadCloud,
+  FileSpreadsheet as ExcelIcon,
+  FileText as CSVIcon
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -86,10 +94,29 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
 
-// SweetAlert2 configuration
+// SweetAlert2 configuration with background locking and Lucide icons
+const showModalWithLockedBackground = (options) => {
+  // Lock background
+  document.body.style.overflow = 'hidden';
+  document.body.style.paddingRight = '15px';
+  
+  // Add event listener to unlock background when modal closes
+  const originalCloseHandler = options.willClose;
+  options.willClose = () => {
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+    if (originalCloseHandler) originalCloseHandler();
+  };
+  
+  return MySwal.fire(options);
+};
+
 const showSuccessAlert = (title, message) => {
-  MySwal.fire({
-    title: <span className="text-emerald-600">{title}</span>,
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2">
+      <CheckCircle className="w-6 h-6 text-emerald-600" />
+      <span>{title}</span>
+    </div>,
     html: <p className="text-gray-700">{message}</p>,
     icon: 'success',
     confirmButtonText: 'OK',
@@ -97,15 +124,18 @@ const showSuccessAlert = (title, message) => {
     showCloseButton: true,
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold',
+      title: 'text-lg font-bold flex items-center gap-2',
       confirmButton: 'px-4 py-2 rounded-lg font-medium'
     }
   });
 };
 
 const showWarningAlert = (title, message, actionButton = null) => {
-  return MySwal.fire({
-    title: <span className="text-amber-600">{title}</span>,
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2">
+      <AlertTriangle className="w-6 h-6 text-amber-600" />
+      <span>{title}</span>
+    </div>,
     html: <p className="text-gray-700">{message}</p>,
     icon: 'warning',
     confirmButtonColor: actionButton?.color || '#f59e0b',
@@ -113,7 +143,7 @@ const showWarningAlert = (title, message, actionButton = null) => {
     showCloseButton: true,
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold',
+      title: 'text-lg font-bold flex items-center gap-2',
       confirmButton: 'px-4 py-2 rounded-lg font-medium',
       cancelButton: 'px-4 py-2 rounded-lg font-medium'
     },
@@ -125,8 +155,11 @@ const showWarningAlert = (title, message, actionButton = null) => {
 };
 
 const showErrorAlert = (title, message) => {
-  MySwal.fire({
-    title: <span className="text-rose-600">{title}</span>,
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2">
+      <XCircle className="w-6 h-6 text-rose-600" />
+      <span>{title}</span>
+    </div>,
     html: <p className="text-gray-700">{message}</p>,
     icon: 'error',
     confirmButtonText: 'Try Again',
@@ -134,15 +167,18 @@ const showErrorAlert = (title, message) => {
     showCloseButton: true,
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold',
+      title: 'text-lg font-bold flex items-center gap-2',
       confirmButton: 'px-4 py-2 rounded-lg font-medium'
     }
   });
 };
 
 const showConfirmDialog = (title, message, confirmText, cancelText) => {
-  return MySwal.fire({
-    title: <span className="text-gray-900">{title}</span>,
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2">
+      <AlertCircle className="w-6 h-6 text-gray-900" />
+      <span>{title}</span>
+    </div>,
     html: <p className="text-gray-700">{message}</p>,
     icon: 'question',
     showCancelButton: true,
@@ -153,9 +189,400 @@ const showConfirmDialog = (title, message, confirmText, cancelText) => {
     reverseButtons: true,
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold',
+      title: 'text-lg font-bold flex items-center gap-2',
       confirmButton: 'px-4 py-2 rounded-lg font-medium',
       cancelButton: 'px-4 py-2 rounded-lg font-medium'
+    }
+  });
+};
+
+// Helper function to show SweetAlert2 file upload modal
+const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplete) => {
+  let selectedFile = null;
+  let validationData = null;
+  let previewData = null;
+  let showValidationResults = false;
+
+  const FileUploadView = () => (
+    <div className="space-y-6">
+      {/* Drag and Drop Area */}
+      <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-300 transition-colors bg-gray-50/50">
+        <input
+          type="file"
+          id="file-upload-input"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) {
+              processFile(file);
+            }
+          }}
+          accept=".csv,.xlsx,.xls,.json,.txt"
+        />
+        <label htmlFor="file-upload-input" className="cursor-pointer">
+          <div className="flex flex-col items-center">
+            <div className="p-4 bg-blue-50 rounded-full mb-4">
+              <UploadCloud className="w-12 h-12 text-blue-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              {selectedFile ? 'File Selected' : 'Drag & Drop or Click to Upload'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {selectedFile ? selectedFile.name : 'Supports CSV, Excel, JSON files up to 10MB'}
+            </p>
+            {!selectedFile && (
+              <div className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium">
+                Browse Files
+              </div>
+            )}
+          </div>
+        </label>
+      </div>
+
+      {/* File Preview */}
+      {previewData && (
+        <div className="space-y-4">
+          <h4 className="font-semibold text-gray-900">File Preview</h4>
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                {getFileIcon(selectedFile.name)}
+                <div>
+                  <h5 className="font-medium text-gray-800">{selectedFile.name}</h5>
+                  <p className="text-sm text-gray-600">
+                    {(selectedFile.size / 1024).toFixed(2)} KB • {previewData.rowCount} records
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="bg-white rounded border border-gray-300 p-3 max-h-60 overflow-y-auto">
+                <pre className="text-sm text-gray-700 font-mono whitespace-pre-wrap">
+                  {previewData.content}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* File Format Info */}
+      <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+        <h4 className="font-semibold text-blue-800 mb-2">Supported Formats</h4>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex items-center gap-2 p-2 bg-white rounded">
+            <CSVIcon className="w-4 h-4 text-emerald-500" />
+            <span className="text-sm">CSV</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 bg-white rounded">
+            <ExcelIcon className="w-4 h-4 text-green-500" />
+            <span className="text-sm">Excel</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 bg-white rounded">
+            <FileText className="w-4 h-4 text-amber-500" />
+            <span className="text-sm">JSON</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+const ValidationResultsView = () => {
+  if (!validationData) return null;
+  
+  const { totalTransactions, validCount, invalidCount, validationResults, warning } = validationData;
+  const invalidResults = validationResults.filter(result => 
+    result.status === 'INVALID' || result.status === 'UNMATCHED'
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900">Validation Results</h3>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700">
+            {validCount} valid • {invalidCount} invalid
+          </span>
+          {invalidCount > 0 && (
+            <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
+              ⚠️ {invalidCount} Issues
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+          <p className="text-xs text-emerald-700">Valid Transactions</p>
+          <p className="text-2xl font-bold text-emerald-800">{validCount}</p>
+          <p className="text-xs text-emerald-600">Will be auto-matched</p>
+        </div>
+        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+          <p className="text-xs text-amber-700">Invalid Transactions</p>
+          <p className="text-2xl font-bold text-amber-800">{invalidCount}</p>
+          <p className="text-xs text-amber-600">Will be rejected</p>
+        </div>
+      </div>
+
+      {/* Issues List - UPDATED TO SHOW ALL ISSUES */}
+      {invalidCount > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold text-gray-900">
+              All Issues Found ({invalidResults.length})
+            </h4>
+            <span className="text-xs text-gray-500">
+              Showing all {invalidResults.length} issues
+            </span>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <div className="max-h-96 overflow-y-auto">
+                <table className="w-full min-w-full">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Row #</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Issue Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {invalidResults.map((result, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-mono whitespace-nowrap">#{index + 1}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <code className="text-xs font-mono bg-gray-200 px-2 py-1 rounded truncate max-w-xs inline-block">
+                            {result.bankReference || 'N/A'}
+                          </code>
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
+                          KSh {result.amount?.toLocaleString('en-KE') || '0'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            result.status === 'INVALID' 
+                              ? 'bg-rose-100 text-rose-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {result.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-gray-900 mb-1">{result.validationMessage}</p>
+                          {result.description && (
+                            <p className="text-xs text-gray-500 truncate max-w-md">
+                              {result.description}
+                            </p>
+                          )}
+                          {/* Show additional error details if available */}
+                          {result.errors && (
+                            <div className="mt-1">
+                              {Object.entries(result.errors).map(([key, value], idx) => (
+                                <p key={idx} className="text-xs text-rose-600">
+                                  • {key}: {value}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning */}
+      {warning && (
+        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+            <p className="text-sm text-amber-700">{warning}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Resolution Instructions - Enhanced */}
+      {invalidCount > 0 && (
+        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-amber-800 mb-2">How to Resolve These Issues</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <h5 className="text-sm font-medium text-amber-800 mb-1">For INVALID transactions:</h5>
+                  <ul className="text-xs text-amber-700 space-y-1">
+                    <li className="flex items-start gap-1">
+                      <span>•</span>
+                      <span>Fix in source file and re-upload</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span>•</span>
+                      <span>Check for missing required fields</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span>•</span>
+                      <span>Verify amount formats (no currency symbols)</span>
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h5 className="text-sm font-medium text-amber-800 mb-1">For UNMATCHED transactions:</h5>
+                  <ul className="text-xs text-amber-700 space-y-1">
+                    <li className="flex items-start gap-1">
+                      <span>•</span>
+                      <span>Will appear in "Unmatched" tab for manual matching</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span>•</span>
+                      <span>Check student name/ID references</span>
+                    </li>
+                    <li className="flex items-start gap-1">
+                      <span>•</span>
+                      <span>Verify payment dates are valid</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+  const processFile = (file) => {
+    selectedFile = file;
+    previewData = null;
+    
+    // Generate preview
+    if (file.type === 'application/json') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const jsonContent = JSON.parse(e.target.result);
+          previewData = {
+            type: 'json',
+            content: JSON.stringify(jsonContent, null, 2).substring(0, 1000) + '...',
+            rowCount: Array.isArray(jsonContent) ? jsonContent.length : 1
+          };
+          updateModal();
+        } catch (error) {
+          previewData = {
+            type: 'text',
+            content: 'Unable to parse JSON. Raw preview: ' + e.target.result.substring(0, 1000) + '...',
+            rowCount: 1
+          };
+          updateModal();
+        }
+      };
+      reader.readAsText(file);
+    } else if (file.type.includes('csv') || file.name.endsWith('.csv')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const lines = e.target.result.split('\n');
+        previewData = {
+          type: 'csv',
+          content: lines.slice(0, 10).join('\n'),
+          rowCount: Math.max(0, lines.length - 1)
+        };
+        updateModal();
+      };
+      reader.readAsText(file);
+    } else if (file.type.includes('sheet') || file.name.match(/\.xlsx?$/i)) {
+      previewData = {
+        type: 'excel',
+        content: 'Excel file preview not available. File will be processed on upload.',
+        rowCount: 'Unknown'
+      };
+      updateModal();
+    } else {
+      previewData = {
+        type: 'file',
+        content: 'File preview not available.',
+        rowCount: 'Unknown'
+      };
+      updateModal();
+    }
+  };
+
+  const getFileIcon = (fileName) => {
+    if (fileName?.endsWith('.csv')) return <CSVIcon className="w-8 h-8 text-emerald-600" />;
+    if (fileName?.endsWith('.xlsx') || fileName?.endsWith('.xls')) return <ExcelIcon className="w-8 h-8 text-green-600" />;
+    if (fileName?.endsWith('.json')) return <FileText className="w-8 h-8 text-amber-600" />;
+    return <File className="w-8 h-8 text-blue-600" />;
+  };
+
+  const updateModal = () => {
+    MySwal.update({
+      html: showValidationResults ? <ValidationResultsView /> : <FileUploadView />
+    });
+  };
+
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2">
+      <Upload className="w-6 h-6 text-blue-600" />
+      <span>{showValidationResults ? 'Import Validation' : 'Import Bank Statement'}</span>
+    </div>,
+    html: <FileUploadView />,
+    showCancelButton: true,
+    showConfirmButton: true,
+    confirmButtonText: showValidationResults ? 'Proceed with Import' : 'Validate File',
+    cancelButtonText: showValidationResults ? 'Back' : 'Cancel',
+    confirmButtonColor: showValidationResults ? '#10b981' : '#3b82f6',
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl w-full max-w-2xl',
+      title: 'text-lg font-bold flex items-center gap-2',
+      confirmButton: 'px-4 py-2 rounded-lg font-medium',
+      cancelButton: 'px-4 py-2 rounded-lg font-medium'
+    },
+    preConfirm: async () => {
+      if (!showValidationResults) {
+        // Validate file
+        if (!selectedFile) {
+          MySwal.showValidationMessage('Please select a file first');
+          return false;
+        }
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', selectedFile);
+          formData.append('bankAccount', 'default');
+          
+          const response = await transactionApi.post('/import/validate', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          
+          validationData = handleResponse(response);
+          showValidationResults = true;
+          updateModal();
+          return false; // Don't close modal
+        } catch (error) {
+          MySwal.showValidationMessage(error.message || 'Validation failed');
+          return false;
+        }
+      } else {
+        // Proceed with import
+        if (onImportComplete && selectedFile) {
+          await onImportComplete(selectedFile);
+        }
+        return true; // Close modal
+      }
+    },
+    willClose: () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
     }
   });
 };
@@ -348,7 +775,6 @@ const transformTransactionResponse = (apiData) => {
       };
 
       // Clean up: remove flat fields that are now nested
-      // ✅ FIXED: Use Object.prototype.hasOwnProperty.call() instead of direct call
       const fieldsToRemove = [
         'studentId', 'studentName', 'studentGrade',
         'hasTermAssignments', 'termAssignmentCount',
@@ -359,7 +785,6 @@ const transformTransactionResponse = (apiData) => {
       ];
 
       fieldsToRemove.forEach(field => {
-        // ✅ FIXED: Use the safe method
         if (Object.prototype.hasOwnProperty.call(transformed, field)) {
           delete transformed[field];
         }
@@ -483,327 +908,119 @@ const handleError = (error) => {
   }
 };
 
-// Import Modal Component
-const ImportModal = ({ isOpen, onClose, onUpload, isLoading }) => {
-  const [file, setFile] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [preview, setPreview] = useState(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
-
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      processFile(selectedFile);
-    }
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setDragOver(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      processFile(droppedFile);
-    }
-  };
-
-  const processFile = (selectedFile) => {
-    setFile(selectedFile);
-    
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      showErrorAlert('File Too Large', 'File size should be less than 10MB');
-      return;
-    }
-
-    const validTypes = [
-      'text/csv',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/json',
-      'text/plain'
-    ];
-
-    if (!validTypes.includes(selectedFile.type) && !selectedFile.name.match(/\.(csv|xlsx?|json|txt)$/i)) {
-      showErrorAlert('Invalid File Type', 'Please upload CSV, Excel, JSON, or text files only');
-      return;
-    }
-
-    if (selectedFile.type === 'application/json') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const jsonContent = JSON.parse(e.target.result);
-          setPreview({
-            type: 'json',
-            content: JSON.stringify(jsonContent, null, 2).substring(0, 500) + '...',
-            count: Array.isArray(jsonContent) ? jsonContent.length : 1
-          });
-        } catch (error) {
-          setPreview({
-            type: 'text',
-            content: 'Unable to parse JSON. Raw preview: ' + e.target.result.substring(0, 500) + '...'
-          });
-        }
-      };
-      reader.readAsText(selectedFile);
-    } else if (selectedFile.type.includes('csv') || selectedFile.name.endsWith('.csv')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const lines = e.target.result.split('\n');
-        setPreview({
-          type: 'csv',
-          content: lines.slice(0, 5).join('\n'),
-          count: lines.length - 1
-        });
-      };
-      reader.readAsText(selectedFile);
-    } else {
-      setPreview({
-        type: 'file',
-        name: selectedFile.name,
-        size: (selectedFile.size / 1024).toFixed(2) + ' KB'
-      });
-    }
-  };
-
-  const handleUpload = () => {
-    if (file) {
-      onUpload(file);
-      resetModal();
-    }
-  };
-
-  const resetModal = () => {
-    setFile(null);
-    setPreview(null);
-    onClose();
-  };
-
-  const getFileIcon = (fileName) => {
-    if (fileName?.endsWith('.csv')) return <FileText className="w-10 h-10 text-emerald-600" />;
-    if (fileName?.endsWith('.xlsx') || fileName?.endsWith('.xls')) return <FileSpreadsheet className="w-10 h-10 text-green-600" />;
-    if (fileName?.endsWith('.json')) return <FileText className="w-10 h-10 text-amber-600" />;
-    return <File className="w-10 h-10 text-blue-600" />;
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 overflow-y-auto"
-      >
-        <div 
-          className="fixed inset-0 bg-linear-to-br from-white/40 via-gray-50/30 to-blue-50/20 backdrop-blur-md"
-          onClick={resetModal}
-        />
-        
-        <div className="relative min-h-screen flex items-start justify-center p-4 pt-28 lg:pt-32">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300, delay: 0.1 }}
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-2xl mt-4"
-          >
-            <div className="relative bg-linear-to-br from-white/95 via-white/92 to-white/95 backdrop-blur-xl rounded-2xl border border-white/50 shadow-2xl overflow-hidden">
-              <div className="p-6 border-b border-gray-100/50 bg-linear-to-r from-white/60 via-white/40 to-white/60">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-linear-to-br from-blue-100/50 to-blue-200/50 backdrop-blur-sm rounded-xl">
-                      <Upload className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-800">Import Bank Statement</h2>
-                      <p className="text-gray-600 mt-1">Upload CSV, Excel, or JSON files from your bank</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={resetModal}
-                    className="p-2 hover:bg-white/60 rounded-full transition-colors backdrop-blur-sm"
-                  >
-                    <XIcon className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="mb-8">
-                  <div
-                    className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
-                      dragOver
-                        ? 'border-blue-400 bg-blue-50/50 scale-[1.02] backdrop-blur-sm'
-                        : 'border-gray-300/60 hover:border-blue-300/60 hover:bg-gray-50/40 backdrop-blur-sm'
-                    }`}
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 51, 234, 0.04) 100%)',
-                    }}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <input
-                      type="file"
-                      id="file-upload"
-                      className="hidden"
-                      onChange={handleFileChange}
-                      accept=".csv,.xlsx,.xls,.json,.txt"
-                    />
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <div className="flex flex-col items-center">
-                        <div className="p-4 bg-linear-to-br from-blue-50/70 to-blue-100/70 backdrop-blur-sm rounded-full mb-4">
-                          <CloudUpload className="w-12 h-12 text-blue-500" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                          {file ? 'File Selected' : 'Drag & Drop or Click to Upload'}
-                        </h3>
-                        <p className="text-gray-600 mb-4">
-                          {file ? file.name : 'Supports CSV, Excel, JSON files up to 10MB'}
-                        </p>
-                        {!file && (
-                          <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="px-6 py-3 bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium shadow-lg shadow-blue-400/20 hover:shadow-xl hover:shadow-blue-400/30 transition-all"
-                          >
-                            Browse Files
-                          </motion.div>
-                        )}
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {file && preview && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-8"
-                  >
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">File Preview</h3>
-                    <div className="bg-white/80 backdrop-blur-sm rounded-lg border border-gray-200/40 p-6 shadow-sm">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-4">
-                          {getFileIcon(file.name)}
-                          <div>
-                            <h4 className="font-medium text-gray-800">{file.name}</h4>
-                            <p className="text-sm text-gray-600">
-                              {(file.size / 1024).toFixed(2)} KB • {preview.count ? `${preview.count} records` : 'Processing...'}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setFile(null);
-                            setPreview(null);
-                          }}
-                          className="p-2 hover:bg-white/60 rounded-full backdrop-blur-sm"
-                        >
-                          <XIcon className="w-5 h-5 text-gray-500" />
-                        </button>
-                      </div>
-
-                      {preview.content && (
-                        <div className="mt-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <FileSearch className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-medium text-gray-700">Preview</span>
-                          </div>
-                          <div className="bg-gray-50/90 backdrop-blur-sm rounded-lg p-4 overflow-auto max-h-60 shadow-inner border border-gray-200/30">
-                            <pre className="text-sm text-gray-700 font-mono whitespace-pre-wrap">
-                              {preview.content}
-                            </pre>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
-                <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-gray-800 mb-3">Supported Formats</h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/40">
-                      <FileText className="w-5 h-5 text-emerald-500" />
-                      <span className="text-sm font-medium">CSV</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/40">
-                      <FileSpreadsheet className="w-5 h-5 text-green-500" />
-                      <span className="text-sm font-medium">Excel</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/40">
-                      <FileText className="w-5 h-5 text-amber-500" />
-                      <span className="text-sm font-medium">JSON</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-linear-to-r from-blue-50/70 to-indigo-50/70 backdrop-blur-sm rounded-lg p-4 border border-blue-100/50">
-                  <h4 className="font-semibold text-blue-800 mb-2">📋 Import Instructions</h4>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• Ensure file has columns: Date, Description, Amount, Reference</li>
-                    <li>• Remove any header rows or footers from the statement</li>
-                    <li>• Date format should be YYYY-MM-DD or DD/MM/YYYY</li>
-                    <li>• Amount should be numeric (KES symbol will be removed)</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-100/50 bg-linear-to-r from-transparent via-white/50 to-transparent">
-                <div className="flex gap-3">
-                  <button
-                    onClick={resetModal}
-                    disabled={isLoading}
-                    className="flex-1 px-4 py-3 bg-white/80 hover:bg-white text-gray-700 rounded-lg border border-gray-300/60 backdrop-blur-sm transition-all text-sm font-medium hover:shadow-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleUpload}
-                    disabled={!file || isLoading}
-                    className="flex-1 px-4 py-3 bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-400/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium hover:shadow-xl hover:shadow-emerald-400/30"
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Importing...
-                      </span>
-                    ) : (
-                      'Import File'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+// Show validation issues modal
+const showValidationIssuesModal = (validationData) => {
+  const { validationResults, invalidCount } = validationData;
+  const invalidResults = validationResults.filter(
+    result => result.status === 'INVALID' || result.status === 'UNMATCHED'
   );
+
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2">
+      <AlertOctagon className="w-6 h-6 text-amber-600" />
+      <span>Validation Issues ({invalidCount})</span>
+    </div>,
+    html: (
+      <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+        {/* Summary Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+            <p className="text-xs text-amber-700 mb-1">Total Issues</p>
+            <p className="text-2xl font-bold text-amber-800">{invalidCount}</p>
+          </div>
+          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <p className="text-xs text-blue-700 mb-1">Invalid</p>
+            <p className="text-2xl font-bold text-blue-800">
+              {invalidResults.filter(r => r.status === 'INVALID').length}
+            </p>
+          </div>
+          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <p className="text-xs text-gray-700 mb-1">Unmatched</p>
+            <p className="text-2xl font-bold text-gray-800">
+              {invalidResults.filter(r => r.status === 'UNMATCHED').length}
+            </p>
+          </div>
+        </div>
+
+        {/* Issues Table */}
+        <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Row #</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Reference</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Issue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {invalidResults.slice(0, 20).map((result, index) => (
+                  <tr key={index} className="hover:bg-gray-100">
+                    <td className="px-4 py-3 text-sm font-mono">#{index + 1}</td>
+                    <td className="px-4 py-3">
+                      <code className="text-xs font-mono bg-gray-200 px-2 py-1 rounded">
+                        {result.bankReference || 'N/A'}
+                      </code>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium">
+                      KSh {result.amount?.toLocaleString('en-KE') || '0'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        result.status === 'INVALID' 
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {result.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <p className="font-medium">{result.validationMessage}</p>
+                      <p className="text-xs text-gray-500 truncate max-w-xs">
+                        {result.description || 'No description'}
+                      </p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {invalidCount > 20 && (
+          <div className="text-center text-sm text-gray-500">
+            Showing 20 of {invalidCount} issues. Remaining issues will be marked as UNVERIFIED.
+          </div>
+        )}
+
+        {/* Resolution Instructions */}
+        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-amber-800 mb-2">How to Resolve</h4>
+              <ul className="text-sm text-amber-700 space-y-1">
+                <li>• Invalid transactions: Fix in source file and re-upload</li>
+                <li>• Unmatched transactions: Will appear in "Unmatched" tab for manual matching</li>
+                <li>• Ensure unique reference numbers</li>
+                <li>• Check date formats (YYYY-MM-DD or DD/MM/YYYY)</li>
+                <li>• Remove currency symbols from amount columns</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+    width: 800,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl',
+      title: 'text-lg font-bold flex items-center gap-2'
+    }
+  });
 };
 
 const SimplePagination = ({ currentPage, onPageChange, hasNextPage, hasPreviousPage }) => {
@@ -859,7 +1076,6 @@ const Transactions = () => {
   const [selectedTransactions, setSelectedTransactions] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [activeTab, setActiveTab] = useState('unverified');
-  const [showImportModal, setShowImportModal] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const MAX_PAGE_ROWS = 20;
@@ -1093,7 +1309,7 @@ const Transactions = () => {
     }
   };
 
-  // View term assignments for a student
+  // View term assignments for a student - using SweetAlert2
   const handleViewTermAssignments = async (student) => {
     if (!student) return;
     
@@ -1146,12 +1362,15 @@ const Transactions = () => {
       };
 
       // Show as SweetAlert2 popup
-      MySwal.fire({
-        title: <span className="text-gray-900">Term Assignments - {student.fullName}</span>,
+      await showModalWithLockedBackground({
+        title: <div className="flex items-center gap-2">
+          <BookOpen className="w-6 h-6 text-gray-900" />
+          <span>Term Assignments - {student.fullName}</span>
+        </div>,
         html: (
           <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
             {/* Student Information */}
-            <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1214,10 +1433,6 @@ const Transactions = () => {
                       <p className="text-xs text-amber-700 mt-1">
                         This student has not been assigned to any academic terms.
                       </p>
-                      <div className="mt-2 text-xs text-amber-700">
-                        <p className="font-medium">Required Action:</p>
-                        <p className="mt-1">Please assign this student to academic terms in the Term Management section.</p>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1243,15 +1458,6 @@ const Transactions = () => {
                   <p className="text-gray-600 mt-2">
                     This student has not been assigned to any academic terms.
                   </p>
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200 max-w-md mx-auto">
-                    <p className="text-sm text-blue-800 font-medium">Next Steps:</p>
-                    <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                      <li>• Navigate to Term Management section</li>
-                      <li>• Assign student to current academic term</li>
-                      <li>• Configure term fees and due dates</li>
-                      <li>• Refresh student data after assignment</li>
-                    </ul>
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1312,37 +1518,6 @@ const Transactions = () => {
                               />
                             </div>
                           </div>
-                          
-                          {/* Show fee items if available */}
-                          {term.feeItems && term.feeItems.length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-xs font-medium text-gray-700 mb-1">Fee Breakdown:</p>
-                              <div className="grid grid-cols-2 gap-2">
-                                {term.feeBreakdown && (
-                                  <>
-                                    {term.feeBreakdown.tuitionFee > 0 && (
-                                      <div className="text-xs">
-                                        <span className="text-gray-600">Tuition: </span>
-                                        <span className="font-medium">{formatCurrency(term.feeBreakdown.tuitionFee)}</span>
-                                      </div>
-                                    )}
-                                    {term.feeBreakdown.examinationFee > 0 && (
-                                      <div className="text-xs">
-                                        <span className="text-gray-600">Examination: </span>
-                                        <span className="font-medium">{formatCurrency(term.feeBreakdown.examinationFee)}</span>
-                                      </div>
-                                    )}
-                                    {term.feeBreakdown.otherFees > 0 && (
-                                      <div className="text-xs">
-                                        <span className="text-gray-600">Other Fees: </span>
-                                        <span className="font-medium">{formatCurrency(term.feeBreakdown.otherFees)}</span>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          )}
                         </div>
 
                         <div className="ml-3">
@@ -1354,43 +1529,6 @@ const Transactions = () => {
                 </div>
               )}
             </div>
-
-            {/* Summary */}
-            <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-              <h4 className="font-semibold text-gray-900 mb-3">Payment Summary</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-xs text-gray-500">Total Terms</p>
-                  <p className="text-lg font-bold text-gray-900">{termAssignmentCount}</p>
-                </div>
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-xs text-gray-500">Total Fee</p>
-                  <p className="text-lg font-bold text-gray-900">
-                    {formatCurrency(totalTermFee || student.totalFee || 0)}
-                  </p>
-                </div>
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-xs text-gray-500">Total Paid</p>
-                  <p className="text-lg font-bold text-emerald-600">
-                    {formatCurrency(totalTermPaid || student.paidAmount || 0)}
-                  </p>
-                </div>
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-xs text-gray-500">Total Pending</p>
-                  <p className="text-lg font-bold text-amber-600">
-                    {formatCurrency(totalTermPending || student.pendingAmount || 0)}
-                  </p>
-                </div>
-              </div>
-              
-              {!hasTermAssignments && (
-                <div className="mt-3 p-2 bg-amber-50 rounded border border-amber-200">
-                  <p className="text-xs text-amber-700 font-medium">
-                    ℹ️ No term assignments found. Using student-level fee data.
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
         ),
         width: 700,
@@ -1398,7 +1536,7 @@ const Transactions = () => {
         showCloseButton: true,
         customClass: {
           popup: 'rounded-2xl border border-gray-200 shadow-xl',
-          title: 'text-lg font-bold mb-4'
+          title: 'text-lg font-bold flex items-center gap-2'
         }
       });
       
@@ -1406,51 +1544,10 @@ const Transactions = () => {
       console.error('❌ Error in handleViewTermAssignments:', error);
       
       // Show user-friendly error message
-      MySwal.fire({
-        title: <span className="text-amber-600">Term Assignments</span>,
-        html: (
-          <div className="text-center py-4">
-            <Book className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h4 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Term Data</h4>
-            <p className="text-gray-600 mb-4">
-              {error.message || 'Could not retrieve term assignment information.'}
-            </p>
-            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 max-w-md mx-auto">
-              <p className="text-sm font-medium text-gray-900">Student Information:</p>
-              <p className="text-sm text-gray-700">{student.fullName} • {student.grade}</p>
-              <p className="text-xs text-gray-500 mt-1">Student ID: {student.studentId}</p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">Total Fee</p>
-                  <p className="font-bold">KSh {student.totalFee?.toLocaleString('en-KE') || '0'}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">Pending</p>
-                  <p className="font-bold text-amber-600">KSh {student.pendingAmount?.toLocaleString('en-KE') || '0'}</p>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm font-medium text-blue-800">Troubleshooting:</p>
-              <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                <li>• Check if the student exists in the system</li>
-                <li>• Verify term management service is running</li>
-                <li>• Ensure student has active enrollment status</li>
-              </ul>
-            </div>
-          </div>
-        ),
-        width: 500,
-        showConfirmButton: true,
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#3b82f6',
-        showCloseButton: true,
-        customClass: {
-          popup: 'rounded-2xl border border-gray-200 shadow-xl',
-          title: 'text-lg font-bold mb-4',
-          confirmButton: 'px-4 py-2 rounded-lg font-medium'
-        }
-      });
+      await showErrorAlert(
+        'Unable to Load Term Data',
+        error.message || 'Could not retrieve term assignment information.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -1525,29 +1622,6 @@ const Transactions = () => {
               </div>
             </div>
           )}
-
-          {invalidCount > 0 && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertOctagon className="w-4 h-4 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-800">Action Required</p>
-                  <p className="text-xs text-amber-700 mt-1">
-                    {invalidCount} student{invalidCount > 1 ? 's' : ''} cannot receive payments due to missing term assignments.
-                    Please resolve these issues before proceeding.
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs font-medium text-amber-800">Suggested Actions:</p>
-                    <ul className="text-xs text-amber-700 space-y-1">
-                      <li>• Check term management for missing assignments</li>
-                      <li>• Verify student enrollment status</li>
-                      <li>• Ensure term fees are properly configured</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       );
 
@@ -1572,42 +1646,46 @@ const Transactions = () => {
     }
   };
 
-  // Handle file import
-  const handleUpload = async (file) => {
-    if (!file) return;
-    setIsLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await transactionApi.post('/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      const importedData = handleResponse(response);
-      // Transform imported data
-      const transformedData = transformTransactionResponse(importedData);
-      setBankStatements(prev => [...transformedData, ...prev]);
-      setShowImportModal(false);
-      setCurrentPage(1);
-      
-      await fetchStatistics();
-      
-      showSuccessAlert(
-        'File Imported!',
-        `Successfully imported ${importedData.length} transactions from bank statement. Statistics have been updated.`
-      );
-    } catch (error) {
-      console.error('Import error:', error);
-      showErrorAlert('Import Failed', error.message || 'Failed to import bank statement file.');
-    } finally {
-      setIsLoading(false);
-    }
+  // Handle file import using SweetAlert2 modal
+  const handleImportFile = () => {
+    showFileUploadModal(
+      null, // onFileSelect
+      null, // onValidationComplete
+      async (file) => {
+        setIsLoading(true);
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const response = await transactionApi.post('/import', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          
+          const importedData = handleResponse(response);
+          // Transform imported data
+          const transformedData = transformTransactionResponse(importedData);
+          setBankStatements(prev => [...transformedData, ...prev]);
+          setCurrentPage(1);
+          
+          await fetchStatistics();
+          
+          showSuccessAlert(
+            'File Imported!',
+            `Successfully imported ${importedData.length} transactions from bank statement. Statistics have been updated.`
+          );
+        } catch (error) {
+          console.error('Import error:', error);
+          showErrorAlert('Import Failed', error.message || 'Failed to import bank statement file.');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    );
   };
 
-  // Edit Payment Record
+  // Edit Payment Record - using SweetAlert2
   const handleEditPaymentRecord = async (bankTransaction = null, isNewMatch = false) => {
     if (bankTransaction?.student?.id) {
       const validationResult = await validateStudentForPayment(bankTransaction.student.id);
@@ -1624,7 +1702,7 @@ const Transactions = () => {
         if (warningResult.isConfirmed) {
           const student = getStudentData(bankTransaction.student.id);
           if (student) {
-            handleViewTermAssignments(student);
+            await handleViewTermAssignments(student);
           }
           return;
         }
@@ -1632,13 +1710,14 @@ const Transactions = () => {
     }
 
     const { value: formValues } = await MySwal.fire({
-      title: <span className="text-gray-900">
-        {isNewMatch ? 'Match Bank Transaction' : 'Edit Payment Record'}
-      </span>,
+      title: <div className="flex items-center gap-2">
+        <Edit className="w-6 h-6 text-gray-900" />
+        <span>{isNewMatch ? 'Match Bank Transaction' : 'Edit Payment Record'}</span>
+      </div>,
       html: (
         <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
           {/* Bank Transaction Details */}
-          <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -1672,59 +1751,6 @@ const Transactions = () => {
             </div>
           </div>
 
-          {/* Student Validation Section */}
-          {bankTransaction?.student && (
-            <div className="p-4 bg-linear-to-r from-emerald-50 to-green-50 rounded-lg border border-emerald-200">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <ClipboardCheck className="w-5 h-5 text-emerald-600" />
-                  <h4 className="font-semibold text-gray-900">Student Validation</h4>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const student = getStudentData(bankTransaction.student.id);
-                      if (student) {
-                        handleViewTermAssignments(student);
-                        MySwal.close();
-                      }
-                    }}
-                    className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                  >
-                    View Terms
-                  </button>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-gray-500">Student</p>
-                  <p className="text-sm font-medium">{bankTransaction.student.fullName}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Class</p>
-                  <p className="text-sm font-medium">{bankTransaction.student.grade}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-xs text-gray-500">Term Assignments</p>
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    {bankTransaction.student.hasTermAssignments ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-emerald-500" />
-                        <span className="text-emerald-700">Validated ({bankTransaction.student.termAssignmentCount} terms)</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-4 h-4 text-amber-500" />
-                        <span className="text-amber-700">No term assignments</span>
-                      </>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Student Selection */}
           <div>
             <h4 className="font-semibold text-gray-900 mb-3">Select Student</h4>
@@ -1748,42 +1774,6 @@ const Transactions = () => {
                 ))}
               </select>
             </div>
-            
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {students.slice(0, 3).map(student => (
-                <button
-                  key={student.id}
-                  type="button"
-                  onClick={() => {
-                    document.getElementById('studentSelect').value = student.id;
-                  }}
-                  className={`p-2 border rounded-lg text-left transition-colors ${
-                    student.hasTermAssignments
-                      ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
-                      : 'border-amber-200 bg-amber-50 hover:bg-amber-100'
-                  }`}
-                >
-                  <p className="text-xs font-medium truncate">{student.fullName}</p>
-                  <p className="text-xs text-gray-500">
-                    ID: {student.studentId}
-                  </p>
-                  <div className="flex items-center gap-1 mt-1">
-                    {student.hasTermAssignments ? (
-                      <CheckCircle className="w-3 h-3 text-emerald-500" />
-                    ) : (
-                      <AlertTriangle className="w-3 h-3 text-amber-500" />
-                    )}
-                    <p className={`text-xs ${
-                      student.hasTermAssignments ? 'text-emerald-600' : 'text-amber-600'
-                    }`}>
-                      {student.hasTermAssignments ? 
-                        `${student.termAssignmentCount} term(s)` : 
-                        'No terms'}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Payment Details */}
@@ -1802,9 +1792,6 @@ const Transactions = () => {
                   min="0"
                   readOnly={!!bankTransaction}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Bank transaction amount (read-only)
-                </p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1875,42 +1862,6 @@ const Transactions = () => {
                   className="rounded text-blue-600"
                 />
               </label>
-              <div id="smsPreview" className="mt-3 p-2 bg-white rounded border border-gray-300 text-sm">
-                <p className="text-gray-600">SMS Preview:</p>
-                <p className="font-medium mt-1">
-                  Dear Parent, payment of KSh {bankTransaction?.amount?.toLocaleString('en-KE') || '0'} received for {bankTransaction?.student?.fullName || 'Student'}. Thank you!
-                </p>
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                SMS will be sent to parent's mobile number after verification
-              </div>
-            </div>
-          </div>
-
-          {/* Summary Section */}
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h4 className="font-semibold text-gray-900 mb-3">Verification Summary</h4>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Bank Transaction</span>
-                <span className="font-medium">{bankTransaction?.bankReference || 'New'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Amount</span>
-                <span className="font-medium">KSh {bankTransaction?.amount?.toLocaleString('en-KE') || '0'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">SMS Notification</span>
-                <span className="font-medium text-emerald-600">Will be sent</span>
-              </div>
-              <div className="pt-2 border-t border-gray-200">
-                <div className="flex justify-between text-sm font-semibold">
-                  <span>Action</span>
-                  <span className="text-emerald-600">
-                    {isNewMatch ? 'Match & Verify Payment' : 'Update Payment Record'}
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -1924,7 +1875,7 @@ const Transactions = () => {
       width: 700,
       customClass: {
         popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold',
+        title: 'text-lg font-bold flex items-center gap-2',
       },
       preConfirm: async () => {
         const studentSelect = document.getElementById('studentSelect');
@@ -1944,16 +1895,6 @@ const Transactions = () => {
             <div>
               <p className="text-amber-700 font-medium">Student Validation Failed:</p>
               <p className="text-sm">{validationResult.message}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  handleViewTermAssignments(selectedStudent);
-                  MySwal.close();
-                }}
-                className="mt-2 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-              >
-                View Term Assignments
-              </button>
             </div>
           );
           return false;
@@ -2101,15 +2042,18 @@ const Transactions = () => {
     }
   };
 
-  // Handle view transaction details
+  // Handle view transaction details - using SweetAlert2
   const handleViewTransactionDetails = (transaction) => {
     const student = transaction.student;
     const isMatched = transaction.status === 'MATCHED';
     const isVerified = transaction.status === 'VERIFIED';
     const smsSent = transaction.smsSent || false;
 
-    MySwal.fire({
-      title: <span className="text-gray-900">Transaction Details</span>,
+    showModalWithLockedBackground({
+      title: <div className="flex items-center gap-2">
+        <Eye className="w-6 h-6 text-gray-900" />
+        <span>Transaction Details</span>
+      </div>,
       html: (
         <div className="text-left space-y-6">
           {/* Transaction Type */}
@@ -2180,30 +2124,25 @@ const Transactions = () => {
                 Sent on: {new Date(transaction.smsSentAt).toLocaleString()}
               </p>
             )}
-            {!smsSent && isMatched && (
-              <p className="text-xs text-gray-500 mt-2">
-                SMS will be sent automatically for auto-matched transactions
-              </p>
-            )}
           </div>
 
-          {/* Student Term Assignment Status */}
+          {/* Student Information */}
           {student && (
-            <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-blue-600" />
-                  <h4 className="font-semibold text-gray-900">Term Assignments</h4>
+                  <h4 className="font-semibold text-gray-900">Student Information</h4>
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     MySwal.close();
-                    handleViewTermAssignments(student);
+                    await handleViewTermAssignments(student);
                   }}
                   className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
                 >
-                  View Details
+                  View Term Assignments
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -2236,12 +2175,6 @@ const Transactions = () => {
                   <p className="text-sm font-medium">{student.termAssignmentCount || 0}</p>
                 </div>
               </div>
-              {student.pendingAmount > 0 && (
-                <div className="mt-3 p-2 bg-amber-50 rounded border border-amber-200">
-                  <p className="text-xs font-medium text-amber-800">Pending Amount</p>
-                  <p className="text-lg font-bold text-amber-900">KSh {student.pendingAmount.toLocaleString('en-KE')}</p>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -2251,7 +2184,7 @@ const Transactions = () => {
       showCloseButton: true,
       customClass: {
         popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold mb-4'
+        title: 'text-lg font-bold flex items-center gap-2'
       }
     });
   };
@@ -2304,9 +2237,9 @@ const Transactions = () => {
                       {student && (
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             MySwal.close();
-                            handleViewTermAssignments(student);
+                            await handleViewTermAssignments(student);
                           }}
                           className="mt-2 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
                         >
@@ -2317,19 +2250,14 @@ const Transactions = () => {
                   );
                 })}
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg mt-4">
-                <p className="text-sm text-blue-800 font-medium">Required Actions:</p>
-                <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                  <li>• Assign missing term assignments in Term Management</li>
-                  <li>• Verify term fee configurations</li>
-                  <li>• Ensure student enrollment status is active</li>
-                </ul>
-              </div>
             </div>
           );
 
           await MySwal.fire({
-            title: <span className="text-amber-600">Resolve These Issues</span>,
+            title: <div className="flex items-center gap-2">
+              <AlertTriangle className="w-6 h-6 text-amber-600" />
+              <span>Resolve These Issues</span>
+            </div>,
             html: issuesHtml,
             showConfirmButton: true,
             confirmButtonText: 'Understood',
@@ -2337,7 +2265,7 @@ const Transactions = () => {
             width: 600,
             customClass: {
               popup: 'rounded-2xl border border-gray-200 shadow-xl',
-              title: 'text-lg font-bold',
+              title: 'text-lg font-bold flex items-center gap-2',
             }
           });
           
@@ -2505,8 +2433,8 @@ const Transactions = () => {
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
-              onClick={() => setShowImportModal(true)}
-              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-sm hover:shadow-md transition-all"
+              onClick={handleImportFile}
+              className="flex items-center justify-center gap-2 bg-linear-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-3 rounded-xl shadow-lg shadow-blue-400/20 hover:shadow-xl hover:shadow-blue-400/30 transition-all"
             >
               <Upload className="w-4 h-4" />
               Import Bank Statement
@@ -2808,7 +2736,7 @@ const Transactions = () => {
                     const isUnverified = transaction.status === 'UNVERIFIED' || transaction.status === 'PENDING';
                     const isMatched = transaction.status === 'MATCHED';
                     const isVerified = transaction.status === 'VERIFIED';
-                    const student = transaction.student; // Now properly nested!
+                    const student = transaction.student;
                     const smsSent = transaction.smsSent || false;
 
                     return (
@@ -3055,7 +2983,7 @@ const Transactions = () => {
                     </p>
                     {activeTab === 'unverified' && (
                       <button
-                        onClick={() => setShowImportModal(true)}
+                        onClick={handleImportFile}
                         className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg"
                       >
                         <Upload className="w-4 h-4" />
@@ -3079,14 +3007,6 @@ const Transactions = () => {
           />
         )}
       </motion.div>
-
-      {/* Enhanced Import Modal with Glassmorphism */}
-      <ImportModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onUpload={handleUpload}
-        isLoading={isLoading}
-      />
     </div>
   );
 };
