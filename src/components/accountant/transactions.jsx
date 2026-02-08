@@ -202,6 +202,8 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
   let validationData = null;
   let previewData = null;
   let showValidationResults = false;
+  let invalidCount = 0;
+  let validCount = 0;
 
   const FileUploadView = () => (
     <div className="space-y-6">
@@ -287,178 +289,221 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
     </div>
   );
 
-const ValidationResultsView = () => {
-  if (!validationData) return null;
-  
-  const { totalTransactions, validCount, invalidCount, validationResults, warning } = validationData;
-  const invalidResults = validationResults.filter(result => 
-    result.status === 'INVALID' || result.status === 'UNMATCHED'
-  );
+  const ValidationResultsView = () => {
+    if (!validationData) return null;
+    
+    const { validationResults, warning } = validationData;
+    const invalidResults = validationResults.filter(result => 
+      result.status === 'INVALID' || result.status === 'UNMATCHED'
+    );
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Validation Results</h3>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700">
-            {validCount} valid • {invalidCount} invalid
-          </span>
-          {invalidCount > 0 && (
-            <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
-              ⚠️ {invalidCount} Issues
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">Validation Results</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">
+              {validCount} valid • {invalidCount} invalid
             </span>
-          )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-          <p className="text-xs text-emerald-700">Valid Transactions</p>
-          <p className="text-2xl font-bold text-emerald-800">{validCount}</p>
-          <p className="text-xs text-emerald-600">Will be auto-matched</p>
-        </div>
-        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-          <p className="text-xs text-amber-700">Invalid Transactions</p>
-          <p className="text-2xl font-bold text-amber-800">{invalidCount}</p>
-          <p className="text-xs text-amber-600">Will be rejected</p>
-        </div>
-      </div>
-
-      {/* Issues List - UPDATED TO SHOW ALL ISSUES */}
-      {invalidCount > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-gray-900">
-              All Issues Found ({invalidResults.length})
-            </h4>
-            <span className="text-xs text-gray-500">
-              Showing all {invalidResults.length} issues
-            </span>
+            {invalidCount > 0 && (
+              <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
+                ⚠️ {invalidCount} Issues
+              </span>
+            )}
           </div>
-          
-          <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <div className="max-h-96 overflow-y-auto">
-                <table className="w-full min-w-full">
-                  <thead className="bg-gray-100 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Row #</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Issue Description</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {invalidResults.map((result, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-mono whitespace-nowrap">#{index + 1}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <code className="text-xs font-mono bg-gray-200 px-2 py-1 rounded truncate max-w-xs inline-block">
-                            {result.bankReference || 'N/A'}
-                          </code>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
-                          KSh {result.amount?.toLocaleString('en-KE') || '0'}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            result.status === 'INVALID' 
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {result.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-gray-900 mb-1">{result.validationMessage}</p>
-                          {result.description && (
-                            <p className="text-xs text-gray-500 truncate max-w-md">
-                              {result.description}
-                            </p>
-                          )}
-                          {/* Show additional error details if available */}
-                          {result.errors && (
-                            <div className="mt-1">
-                              {Object.entries(result.errors).map(([key, value], idx) => (
-                                <p key={idx} className="text-xs text-rose-600">
-                                  • {key}: {value}
-                                </p>
-                              ))}
-                            </div>
-                          )}
-                        </td>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+            <p className="text-xs text-emerald-700">Valid Transactions</p>
+            <p className="text-2xl font-bold text-emerald-800">{validCount}</p>
+            <p className="text-xs text-emerald-600">
+              {invalidCount === 0 ? 'Ready to import' : 'Will be auto-matched'}
+            </p>
+          </div>
+          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <p className="text-xs text-amber-700">Invalid Transactions</p>
+            <p className="text-2xl font-bold text-amber-800">{invalidCount}</p>
+            <p className="text-xs text-amber-600">
+              {invalidCount === 0 ? 'No issues found' : 'Must be resolved first'}
+            </p>
+          </div>
+        </div>
+
+        {/* Success message when no issues */}
+        {invalidCount === 0 && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+              <div>
+                <h5 className="font-semibold text-emerald-800 mb-1">
+                  Validation Successful! ✅
+                </h5>
+                <p className="text-sm text-emerald-700">
+                  All {validCount} transactions are valid and ready to import.
+                  Click "Proceed with Import" to upload the file to the database.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Issues List - Show ALL issues */}
+        {invalidCount > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-gray-900">
+                All Issues Found ({invalidResults.length})
+              </h4>
+              <span className="text-xs text-gray-500">
+                Fix these issues before importing
+              </span>
+            </div>
+            
+            {/* Warning banner when issues exist */}
+            <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-600 mt-0.5 shrink-0" />
+                <div>
+                  <h5 className="font-semibold text-rose-800 mb-1">
+                    {invalidCount} Issue{invalidCount !== 1 ? 's' : ''} Need Attention
+                  </h5>
+                  <p className="text-sm text-rose-700">
+                    You must resolve all validation issues before uploading the file.
+                    The import button will remain disabled until all issues are fixed.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Issues table */}
+            <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full min-w-full">
+                    <thead className="bg-gray-100 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Row #</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Issue Description</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Warning */}
-      {warning && (
-        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
-            <p className="text-sm text-amber-700">{warning}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Resolution Instructions - Enhanced */}
-      {invalidCount > 0 && (
-        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
-            <div className="flex-1">
-              <h4 className="font-semibold text-amber-800 mb-2">How to Resolve These Issues</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <h5 className="text-sm font-medium text-amber-800 mb-1">For INVALID transactions:</h5>
-                  <ul className="text-xs text-amber-700 space-y-1">
-                    <li className="flex items-start gap-1">
-                      <span>•</span>
-                      <span>Fix in source file and re-upload</span>
-                    </li>
-                    <li className="flex items-start gap-1">
-                      <span>•</span>
-                      <span>Check for missing required fields</span>
-                    </li>
-                    <li className="flex items-start gap-1">
-                      <span>•</span>
-                      <span>Verify amount formats (no currency symbols)</span>
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <h5 className="text-sm font-medium text-amber-800 mb-1">For UNMATCHED transactions:</h5>
-                  <ul className="text-xs text-amber-700 space-y-1">
-                    <li className="flex items-start gap-1">
-                      <span>•</span>
-                      <span>Will appear in "Unmatched" tab for manual matching</span>
-                    </li>
-                    <li className="flex items-start gap-1">
-                      <span>•</span>
-                      <span>Check student name/ID references</span>
-                    </li>
-                    <li className="flex items-start gap-1">
-                      <span>•</span>
-                      <span>Verify payment dates are valid</span>
-                    </li>
-                  </ul>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {invalidResults.map((result, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm font-mono whitespace-nowrap">#{index + 1}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <code className="text-xs font-mono bg-gray-200 px-2 py-1 rounded truncate max-w-xs inline-block">
+                              {result.bankReference || 'N/A'}
+                            </code>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
+                            KSh {result.amount?.toLocaleString('en-KE') || '0'}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              result.status === 'INVALID' 
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {result.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-medium text-gray-900 mb-1">{result.validationMessage}</p>
+                            {result.description && (
+                              <p className="text-xs text-gray-500 truncate max-w-md">
+                                {result.description}
+                              </p>
+                            )}
+                            {result.errors && (
+                              <div className="mt-1">
+                                {Object.entries(result.errors).map(([key, value], idx) => (
+                                  <p key={idx} className="text-xs text-rose-600">
+                                    • {key}: {value}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        )}
+
+        {/* Warning */}
+        {warning && (
+          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
+              <p className="text-sm text-amber-700">{warning}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Resolution Instructions - Enhanced */}
+        {invalidCount > 0 && (
+          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-amber-800 mb-2">How to Resolve These Issues</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <h5 className="text-sm font-medium text-amber-800 mb-1">For INVALID transactions:</h5>
+                    <ul className="text-xs text-amber-700 space-y-1">
+                      <li className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>Fix in source file and re-upload</span>
+                      </li>
+                      <li className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>Check for missing required fields</span>
+                      </li>
+                      <li className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>Verify amount formats (no currency symbols)</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-medium text-amber-800 mb-1">For UNMATCHED transactions:</h5>
+                    <ul className="text-xs text-amber-700 space-y-1">
+                      <li className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>Will appear in "Unmatched" tab for manual matching</span>
+                      </li>
+                      <li className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>Check student name/ID references</span>
+                      </li>
+                      <li className="flex items-start gap-1">
+                        <span>•</span>
+                        <span>Verify payment dates are valid</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-amber-200">
+                  <p className="text-sm text-amber-800 font-medium">
+                    After fixing issues, click "Back" and re-upload the corrected file.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const processFile = (file) => {
     selectedFile = file;
@@ -533,21 +578,29 @@ const ValidationResultsView = () => {
       <Upload className="w-6 h-6 text-blue-600" />
       <span>{showValidationResults ? 'Import Validation' : 'Import Bank Statement'}</span>
     </div>,
-    html: <FileUploadView />,
+    html: showValidationResults ? <ValidationResultsView /> : <FileUploadView />,
     showCancelButton: true,
     showConfirmButton: true,
-    confirmButtonText: showValidationResults ? 'Proceed with Import' : 'Validate File',
+    confirmButtonText: showValidationResults 
+      ? (invalidCount === 0 ? 'Proceed with Import' : 'Review Issues') 
+      : 'Validate File',
     cancelButtonText: showValidationResults ? 'Back' : 'Cancel',
-    confirmButtonColor: showValidationResults ? '#10b981' : '#3b82f6',
+    confirmButtonColor: showValidationResults 
+      ? (invalidCount === 0 ? '#10b981' : '#f59e0b')
+      : '#3b82f6',
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl w-full max-w-2xl',
       title: 'text-lg font-bold flex items-center gap-2',
-      confirmButton: 'px-4 py-2 rounded-lg font-medium',
+      confirmButton: `px-4 py-2 rounded-lg font-medium ${
+        showValidationResults && invalidCount > 0 
+          ? 'opacity-50 cursor-not-allowed' 
+          : ''
+      }`,
       cancelButton: 'px-4 py-2 rounded-lg font-medium'
     },
     preConfirm: async () => {
       if (!showValidationResults) {
-        // Validate file
+        // Step 1: Validate file
         if (!selectedFile) {
           MySwal.showValidationMessage('Please select a file first');
           return false;
@@ -566,14 +619,37 @@ const ValidationResultsView = () => {
           
           validationData = handleResponse(response);
           showValidationResults = true;
-          updateModal();
+          
+          // Get counts for button state
+          const invalidResults = validationData.validationResults.filter(result => 
+            result.status === 'INVALID' || result.status === 'UNMATCHED'
+          );
+          invalidCount = invalidResults.length;
+          validCount = validationData.validCount || (validationData.totalTransactions - invalidCount);
+          
+          // Update modal with new state
+          MySwal.update({
+            html: <ValidationResultsView />,
+            confirmButtonText: invalidCount === 0 ? 'Proceed with Import' : 'Review Issues',
+            confirmButtonColor: invalidCount === 0 ? '#10b981' : '#f59e0b',
+            showCancelButton: true,
+            cancelButtonText: 'Back'
+          });
+          
           return false; // Don't close modal
         } catch (error) {
           MySwal.showValidationMessage(error.message || 'Validation failed');
           return false;
         }
       } else {
-        // Proceed with import
+        // Step 2: Proceed with import (only if no invalid issues)
+        if (invalidCount > 0) {
+          // If there are issues, show a warning and don't proceed
+          MySwal.showValidationMessage('Please fix validation issues before importing');
+          return false;
+        }
+        
+        // Only proceed if no invalid issues
         if (onImportComplete && selectedFile) {
           await onImportComplete(selectedFile);
         }
