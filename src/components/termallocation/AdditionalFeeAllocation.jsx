@@ -30,11 +30,15 @@ import axios from 'axios';
 
 const MySwal = withReactContent(Swal);
 
-// ========== API CONFIGURATION ==========
+// ============================================
+// API SERVICE - Fee Allocation
+// ============================================
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 // Create fee management API instance
 const feeApi = axios.create({
-  baseURL: 'http://localhost:8080/api/v1/fee-management',
+  baseURL: '${API_BASE_URL}/v1/fee-management',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -65,7 +69,7 @@ feeApi.interceptors.response.use(
 
 // Create student API instance
 const studentApi = axios.create({
-  baseURL: 'http://localhost:8080/api/v1',
+  baseURL: '${API_BASE_URL}/v1',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',

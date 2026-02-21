@@ -85,9 +85,15 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
 
+// ============================================
+// API SERVICE - Fee Collection
+// ============================================
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
+
 // Create axios instance with the same pattern as Transactions
 const feeApi = axios.create({
-  baseURL: 'http://localhost:8080/api/fee-collection',
+  baseURL: `${API_BASE_URL}/fee-collection`,
   timeout: 10000,
 });
 

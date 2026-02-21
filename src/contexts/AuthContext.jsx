@@ -1,8 +1,10 @@
 // src/contexts/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+
+// Import your configured axios instance
+import axiosInstance from '../api/axiosConfig';
 
 // Create context
 const AuthContext = createContext(null);
@@ -36,18 +38,18 @@ export const AuthProvider = ({ children }) => {
   const [token, setTokenState] = useState(() => localStorage.getItem('token'));
   const navigate = useNavigate();
 
-  // Configure axios base URL - Update this to your backend URL
-  axios.defaults.baseURL = 'http://localhost:8080'; // Update to match your Spring Boot port
-
   // Set token function to keep token state and localStorage in sync
   const setToken = useCallback((newToken) => {
     setTokenState(newToken);
     if (newToken) {
       localStorage.setItem('token', newToken);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      // Also set in axios instance for future requests
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+      console.log('✅ Token set in axios headers');
     } else {
       localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
+      delete axiosInstance.defaults.headers.common['Authorization'];
+      console.log('❌ Token removed from axios headers');
     }
   }, []);
 
@@ -61,14 +63,16 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      const response = await axios.get('/api/auth/me');
+      console.log('Fetching current user...');
+      const response = await axiosInstance.get('/auth/me');
       
       if (response.data.success) {
-        const userData = response.data.data; // Your API returns data in 'data' field
+        const userData = response.data.data;
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
+        console.log('✅ User fetched successfully:', userData);
       } else {
-        // Token is invalid or expired
+        console.warn('❌ Failed to fetch user, token might be invalid');
         setToken(null);
         localStorage.removeItem('user');
       }
@@ -81,14 +85,13 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token, setToken]);
 
-  // Configure axios defaults and auto-login
+  // Check auth status on mount
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
-    }
+    console.log('AuthProvider mounted, stored token exists:', !!storedToken);
     
     if (storedToken) {
+      axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
       fetchCurrentUser();
     } else {
       setLoading(false);
@@ -123,31 +126,35 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  // Login function - Updated for your backend
+  // Login function
   const login = async (credentials) => {
     try {
-      // Your backend expects username field, not email
-      // The Login component sends {email, password} but backend expects {username, password}
-      // We'll map email to username
       const loginData = {
-        username: credentials.email || credentials.username, // Handle both cases
+        username: credentials.email || credentials.username,
         password: credentials.password,
         rememberMe: false
       };
 
-      console.log('Login attempt with data:', loginData);
+      console.log('🔐 Login attempt with username:', loginData.username);
+      console.log('Using API URL:', axiosInstance.defaults.baseURL);
 
-      const response = await axios.post('/api/auth/login', loginData);
+      const response = await axiosInstance.post('/auth/login', loginData);
       
-      console.log('Login response:', response.data);
+      console.log('📥 Login response:', response.data);
       
       if (response.data.success) {
-        const { token: accessToken, ...userData } = response.data.data; // Your API structure
+        const { token: accessToken, ...userData } = response.data.data;
         
-        // Store in localStorage and update state
+        // Store token first
         setToken(accessToken);
         setUser(userData);
         localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Verify token was set
+        console.log('✅ Token verification:', {
+          localStorage: localStorage.getItem('token') ? 'Present' : 'Missing',
+          axiosHeaders: axiosInstance.defaults.headers.common['Authorization'] ? 'Present' : 'Missing'
+        });
         
         showAlert('success', 'Login successful!');
         
@@ -160,37 +167,40 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: response.data.message };
       }
     } catch (error) {
-      console.error('Login error details:', error.response?.data);
+      console.error('❌ Login error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
       const message = error.response?.data?.message || 'Login failed. Please check your credentials.';
       showAlert('error', 'Login Failed', message);
       return { success: false, message };
     }
   };
 
-  // Register function - Updated for your backend
+  // Register function
   const register = async (userData) => {
     try {
-      // Map frontend fields to backend RegisterRequest DTO
-      // Include ALL fields that your backend expects
       const registrationData = {
         username: userData.username,
         email: userData.email,
-        fullName: userData.fullName, // Using fullName field from form
+        fullName: userData.fullName,
         password: userData.password,
-        confirmPassword: userData.confirmPassword, // Include this field!
+        confirmPassword: userData.confirmPassword,
         phone: userData.phone || '',
         address: userData.address || '',
         role: userData.role
       };
       
-      console.log('Sending registration data:', registrationData);
+      console.log('📝 Sending registration data:', registrationData);
       
-      const response = await axios.post('/api/auth/register', registrationData);
+      const response = await axiosInstance.post('/auth/register', registrationData);
       
-      console.log('Registration response:', response.data);
+      console.log('📥 Registration response:', response.data);
       
       if (response.data.success) {
-        showAlert('success', 'Registration successful!', response.data.message || 'Please login with your credentials.');
+        showAlert('success', 'Registration successful!', 'Please login with your credentials.');
         navigate('/login');
         return { success: true, message: 'Registration successful' };
       } else {
@@ -198,7 +208,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: response.data.message };
       }
     } catch (error) {
-      console.error('Registration error details:', error.response?.data);
+      console.error('❌ Registration error:', error.response?.data);
       const message = error.response?.data?.message || 'Registration failed';
       showAlert('error', 'Registration Failed', message);
       return { success: false, message };
@@ -211,7 +221,8 @@ export const AuthProvider = ({ children }) => {
     
     if (result.isConfirmed) {
       try {
-        await axios.post('/api/auth/logout');
+        await axiosInstance.post('/auth/logout');
+        console.log('✅ Logout successful');
       } catch (error) {
         console.error('Logout error:', error);
       } finally {
@@ -236,7 +247,7 @@ export const AuthProvider = ({ children }) => {
   // Get current user from API
   const getCurrentUser = async () => {
     try {
-      const response = await axios.get('/api/auth/me');
+      const response = await axiosInstance.get('/auth/me');
       if (response.data.success && response.data.data) {
         const userData = response.data.data;
         setUser(userData);
@@ -252,7 +263,7 @@ export const AuthProvider = ({ children }) => {
   // Change password
   const changePassword = async (passwordData) => {
     try {
-      const response = await axios.put('/api/auth/change-password', passwordData);
+      const response = await axiosInstance.put('/auth/change-password', passwordData);
       if (response.data.success) {
         showAlert('success', 'Password changed successfully');
       }
@@ -267,7 +278,7 @@ export const AuthProvider = ({ children }) => {
   // Update profile
   const updateProfile = async (profileData) => {
     try {
-      const response = await axios.put('/api/auth/profile', profileData);
+      const response = await axiosInstance.put('/auth/profile', profileData);
       if (response.data.success && response.data.data) {
         updateUser(response.data.data);
         showAlert('success', 'Profile updated successfully');

@@ -119,11 +119,15 @@ const showConfirmDialog = (title, message, confirmText, cancelText) => {
   });
 };
 
-// ========== API CONFIGURATION ==========
+// ============================================
+// API SERVICE - Fee Structure Management
+// ============================================
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 // Create fee management API instance
 const feeApi = axios.create({
-  baseURL: 'http://localhost:8080/api/v1/fee-management',
+  baseURL: `${API_BASE_URL}/v1/fee-management`,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -132,7 +136,7 @@ const feeApi = axios.create({
 
 // Create student API instance
 const studentApi = axios.create({
-  baseURL: 'http://localhost:8080/api/v1/students',
+  baseURL: `${API_BASE_URL}/v1/students`,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',

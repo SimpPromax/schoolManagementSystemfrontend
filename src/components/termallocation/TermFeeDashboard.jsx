@@ -23,10 +23,14 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
 
-// ========== API CONFIGURATION ==========
+// ============================================
+// API SERVICE - Term Fee Dashboard
+// ============================================
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 const API_CONFIG = {
-  BASE_URL: 'http://localhost:8080/api/v1/fee-management',
+  BASE_URL: `${API_BASE_URL}/v1/fee-management`,
   TIMEOUT: 15000
 };
 
@@ -60,7 +64,7 @@ api.interceptors.response.use(
 );
 
 const studentApi = axios.create({
-  baseURL: 'http://localhost:8080/api/v1',
+  baseURL: `${API_BASE_URL}/v1`,
   timeout: API_CONFIG.TIMEOUT,
 });
 

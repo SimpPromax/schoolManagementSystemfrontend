@@ -32,10 +32,14 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
 
-// ========== API CONFIGURATION ==========
+// ============================================
+// API SERVICE - Term Management
+// ============================================
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 const feeApi = axios.create({
-  baseURL: 'http://localhost:8080/api/v1/fee-management',
+  baseURL: `${API_BASE_URL}/v1/fee-management`,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',

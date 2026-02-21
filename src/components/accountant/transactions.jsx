@@ -55,7 +55,6 @@ import {
   Unlink,
   BarChart,
   CheckCircle2,
-  CircleCheck,
   Circle,
   AlertCircle as AlertCircleIcon,
   File,
@@ -83,7 +82,28 @@ import {
   FileX,
   UploadCloud,
   FileSpreadsheet as ExcelIcon,
-  FileText as CSVIcon
+  FileText as CSVIcon,
+  Filter,
+  Info,
+  ExternalLink,
+  FileWarning,
+  AlertCircle as WarningIcon,
+  HelpCircle,
+  Settings,
+  Send,
+  Copy,
+  Trash2,
+  Hash,
+  Calendar as CalendarIcon,
+  Mail as MailIcon,
+  PhoneCall,
+  FilePlus,
+  GitPullRequest,
+  Layers as LayersIcon,
+  AlertTriangle as AlertTriangleIcon,
+  List,
+  Database as DatabaseIcon,
+  Copy as CopyIcon
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -94,13 +114,11 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const MySwal = withReactContent(Swal);
 
-// SweetAlert2 configuration with background locking and Lucide icons
+// SweetAlert2 configuration
 const showModalWithLockedBackground = (options) => {
-  // Lock background
   document.body.style.overflow = 'hidden';
   document.body.style.paddingRight = '15px';
   
-  // Add event listener to unlock background when modal closes
   const originalCloseHandler = options.willClose;
   options.willClose = () => {
     document.body.style.overflow = '';
@@ -108,44 +126,88 @@ const showModalWithLockedBackground = (options) => {
     if (originalCloseHandler) originalCloseHandler();
   };
   
+  // Set default width for all modals
+  options.width = options.width || 800; // Increased default width
+  
   return MySwal.fire(options);
 };
 
-const showSuccessAlert = (title, message) => {
+// Helper function to create centered content with proper spacing
+const createCenteredContent = (content, isHtml = false) => {
+  if (isHtml && typeof content === 'string') {
+    // For HTML content, wrap in centered container
+    return `
+      <div class="text-center max-w-3xl mx-auto">
+        ${content}
+      </div>
+    `;
+  }
+  
+  // For React components
+  return (
+    <div className="text-center max-w-3xl mx-auto">
+      {content}
+    </div>
+  );
+};
+
+const showSuccessAlert = (title, htmlContent) => {
+  // Create a temporary div to check if content is HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent;
+  const hasTags = tempDiv.children.length > 0 || tempDiv.childNodes.length > 1;
+  
   return showModalWithLockedBackground({
-    title: <div className="flex items-center gap-2">
+    title: <div className="flex items-center gap-2 justify-center">
       <CheckCircle className="w-6 h-6 text-emerald-600" />
       <span>{title}</span>
     </div>,
-    html: <p className="text-gray-700">{message}</p>,
+    html: hasTags ? `
+      <div class="text-center max-w-3xl mx-auto">
+        ${htmlContent}
+      </div>
+    ` : `<p class="text-gray-700 text-center">${htmlContent}</p>`,
     icon: 'success',
     confirmButtonText: 'OK',
     confirmButtonColor: '#10b981',
     showCloseButton: true,
+    width: 700,
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold flex items-center gap-2',
-      confirmButton: 'px-4 py-2 rounded-lg font-medium'
+      title: 'text-lg font-bold flex items-center gap-2 justify-center',
+      confirmButton: 'px-6 py-3 rounded-lg font-medium mx-auto block',
+      htmlContainer: 'text-center'
     }
   });
 };
 
-const showWarningAlert = (title, message, actionButton = null) => {
+const showWarningAlert = (title, htmlContent, actionButton = null) => {
+  // Create a temporary div to check if content is HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = htmlContent;
+  const hasTags = tempDiv.children.length > 0 || tempDiv.childNodes.length > 1;
+  
   return showModalWithLockedBackground({
-    title: <div className="flex items-center gap-2">
+    title: <div className="flex items-center gap-2 justify-center">
       <AlertTriangle className="w-6 h-6 text-amber-600" />
       <span>{title}</span>
     </div>,
-    html: <p className="text-gray-700">{message}</p>,
+    html: hasTags ? `
+      <div class="text-center max-w-4xl mx-auto">
+        ${htmlContent}
+      </div>
+    ` : `<p class="text-gray-700 text-center">${htmlContent}</p>`,
     icon: 'warning',
     confirmButtonColor: actionButton?.color || '#f59e0b',
     cancelButtonColor: '#6b7280',
     showCloseButton: true,
+    width: 800, // Wider for warning alerts
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold flex items-center gap-2',
-      confirmButton: 'px-4 py-2 rounded-lg font-medium',
-      cancelButton: 'px-4 py-2 rounded-lg font-medium'
+      title: 'text-lg font-bold flex items-center gap-2 justify-center',
+      confirmButton: 'px-6 py-3 rounded-lg font-medium',
+      cancelButton: 'px-6 py-3 rounded-lg font-medium',
+      htmlContainer: 'text-center'
     },
     showConfirmButton: !actionButton,
     showCancelButton: !!actionButton,
@@ -156,30 +218,32 @@ const showWarningAlert = (title, message, actionButton = null) => {
 
 const showErrorAlert = (title, message) => {
   return showModalWithLockedBackground({
-    title: <div className="flex items-center gap-2">
+    title: <div className="flex items-center gap-2 justify-center">
       <XCircle className="w-6 h-6 text-rose-600" />
       <span>{title}</span>
     </div>,
-    html: <p className="text-gray-700">{message}</p>,
+    html: `<p class="text-gray-700 text-center max-w-2xl mx-auto">${message}</p>`,
     icon: 'error',
     confirmButtonText: 'Try Again',
     confirmButtonColor: '#ef4444',
     showCloseButton: true,
+    width: 600,
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold flex items-center gap-2',
-      confirmButton: 'px-4 py-2 rounded-lg font-medium'
+      title: 'text-lg font-bold flex items-center gap-2 justify-center',
+      confirmButton: 'px-6 py-3 rounded-lg font-medium mx-auto',
+      htmlContainer: 'text-center'
     }
   });
 };
 
 const showConfirmDialog = (title, message, confirmText, cancelText) => {
   return showModalWithLockedBackground({
-    title: <div className="flex items-center gap-2">
+    title: <div className="flex items-center gap-2 justify-center">
       <AlertCircle className="w-6 h-6 text-gray-900" />
       <span>{title}</span>
     </div>,
-    html: <p className="text-gray-700">{message}</p>,
+    html: `<p class="text-gray-700 text-center max-w-2xl mx-auto">${message}</p>`,
     icon: 'question',
     showCancelButton: true,
     confirmButtonText: confirmText,
@@ -187,13 +251,358 @@ const showConfirmDialog = (title, message, confirmText, cancelText) => {
     confirmButtonColor: '#3b82f6',
     cancelButtonColor: '#6b7280',
     reverseButtons: true,
+    width: 650,
     customClass: {
       popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold flex items-center gap-2',
-      confirmButton: 'px-4 py-2 rounded-lg font-medium',
-      cancelButton: 'px-4 py-2 rounded-lg font-medium'
+      title: 'text-lg font-bold flex items-center gap-2 justify-center',
+      confirmButton: 'px-6 py-3 rounded-lg font-medium',
+      cancelButton: 'px-6 py-3 rounded-lg font-medium',
+      htmlContainer: 'text-center'
     }
   });
+};
+
+// Show duplicate details modal
+const showDuplicateDetailsModal = (duplicateRefs, totalDuplicates) => {
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2 justify-center">
+      <AlertTriangleIcon className="w-6 h-6 text-amber-600" />
+      <span>Duplicate Transactions ({totalDuplicates})</span>
+    </div>,
+    html: `
+      <div class="text-center max-w-5xl mx-auto">
+        <div class="space-y-4">
+          <p class="text-gray-700">
+            The following transaction reference numbers already exist in the database and were skipped:
+          </p>
+          
+          <div class="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
+            <div class="space-y-2">
+              ${duplicateRefs.map((ref, index) => `
+                <div class="flex items-center gap-2 p-2 bg-white rounded border border-gray-200 justify-between">
+                  <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 bg-amber-500 rounded-full shrink-0"></div>
+                    <code class="text-sm font-mono text-gray-800 truncate">
+                      ${ref}
+                    </code>
+                  </div>
+                  <button
+                    class="copy-btn p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                    data-ref="${ref}"
+                    title="Copy reference"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="p-3 bg-blue-50 rounded-lg border border-blue-200 text-left">
+            <div class="flex items-start gap-2">
+              <svg class="w-4 h-4 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-blue-800 mb-1">Why are duplicates skipped?</p>
+                <p class="text-xs text-blue-700">
+                  Each transaction reference must be unique in the database. 
+                  Duplicate transactions are automatically skipped to maintain data integrity.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          ${totalDuplicates > 10 ? `
+            <p class="text-sm text-gray-500">
+              Showing 10 of ${totalDuplicates} duplicate references
+            </p>
+          ` : ''}
+        </div>
+      </div>
+    `,
+    width: 900, // Much wider for tabular data
+    showConfirmButton: true,
+    confirmButtonText: 'Got it',
+    confirmButtonColor: '#3b82f6',
+    showCloseButton: true,
+    didOpen: () => {
+      // Add click handlers for copy buttons
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const ref = e.currentTarget.getAttribute('data-ref');
+          navigator.clipboard.writeText(ref);
+          MySwal.fire({
+            icon: 'success',
+            title: 'Copied!',
+            text: 'Reference copied to clipboard',
+            timer: 1500,
+            showConfirmButton: false
+          });
+        });
+      });
+    },
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl',
+      title: 'text-lg font-bold flex items-center gap-2 justify-center',
+      htmlContainer: 'text-center'
+    }
+  });
+};
+
+// Special modal for tabular data
+const showTableModal = (title, tableContent, width = 1000) => {
+  return showModalWithLockedBackground({
+    title: <div className="flex items-center gap-2 justify-center">
+      <FileSpreadsheet className="w-6 h-6 text-blue-600" />
+      <span>{title}</span>
+    </div>,
+    html: `
+      <div class="text-center max-w-full">
+        <div class="overflow-x-auto">
+          ${tableContent}
+        </div>
+      </div>
+    `,
+    width: width,
+    showConfirmButton: false,
+    showCloseButton: true,
+    customClass: {
+      popup: 'rounded-2xl border border-gray-200 shadow-xl max-w-90vw',
+      title: 'text-lg font-bold flex items-center gap-2 justify-center',
+      htmlContainer: 'text-center p-0',
+      closeButton: 'top-4 right-4'
+    }
+  });
+};
+
+// Helper function to detect and extract issue type
+const extractIssueInfo = (transaction) => {
+  const description = transaction.description || '';
+  const notes = transaction.notes || '';
+  
+  if (!notes || !notes.trim()) {
+    return {
+      hasIssue: false,
+      originalDescription: description,
+      issueType: null,
+      issueMessage: null,
+      color: 'gray',
+      icon: FileText
+    };
+  }
+  
+  let issueMessage = null;
+  let issueType = 'UNMATCHED';
+  
+  // Check for duplicate markers
+  if (notes.includes('[DUPLICATE SKIPPED]') || 
+      notes.includes('Duplicate in database') ||
+      notes.includes('Already exists in database')) {
+    issueType = 'DUPLICATE';
+    issueMessage = 'Duplicate transaction - Already exists in database';
+  }
+  // Check for validation issue patterns
+  else if (notes.match(/\[VALIDATION ISSUE:\s*(.*?)\]/)) {
+    const bracketMatch = notes.match(/\[VALIDATION ISSUE:\s*(.*?)\]/);
+    issueMessage = bracketMatch[1];
+  }
+  else if (notes.includes('Imported with validation issue:')) {
+    issueMessage = notes.split('Imported with validation issue:')[1]?.trim() || notes;
+  }
+  else if (notes.includes('Student validation failed:')) {
+    issueMessage = notes.split('Student validation failed:')[1]?.trim() || notes;
+  }
+  else if (notes.includes('No matching student found')) {
+    issueMessage = 'No matching student found during auto-matching';
+  }
+  else if (notes.toLowerCase().includes('validation issue') || 
+           notes.toLowerCase().includes('validation failed')) {
+    issueMessage = notes;
+  }
+  
+  if (!issueMessage) {
+    return {
+      hasIssue: false,
+      originalDescription: description,
+      issueType: null,
+      issueMessage: null,
+      color: 'gray',
+      icon: FileText
+    };
+  }
+  
+  // Determine issue type based on message
+  const messageLower = issueMessage.toLowerCase();
+  
+  if (issueType === 'DUPLICATE') {
+    // Already set as duplicate
+  } else if (messageLower.includes('missing') || 
+             messageLower.includes('invalid') || 
+             messageLower.includes('required') ||
+             messageLower.includes('format') ||
+             messageLower.includes('malformed') ||
+             messageLower.includes('duplicate')) {
+    issueType = 'INVALID';
+  } else if (messageLower.includes('student not found') || 
+             messageLower.includes('no student match') ||
+             messageLower.includes('partial match') ||
+             messageLower.includes('could not match') ||
+             messageLower.includes('student validation failed') ||
+             messageLower.includes('no matching student')) {
+    issueType = 'UNMATCHED';
+  } else if (messageLower.includes('date') || 
+             messageLower.includes('date format')) {
+    issueType = 'FORMAT';
+  }
+  
+  // Get color and icon based on issue type
+  const getIssueConfig = (type) => {
+    const config = {
+      DUPLICATE: { color: 'gray', icon: DatabaseIcon, label: 'Duplicate' },
+      INVALID: { color: 'rose', icon: FileX, label: 'Invalid' },
+      UNMATCHED: { color: 'amber', icon: User, label: 'Unmatched' },
+      FORMAT: { color: 'purple', icon: Calendar, label: 'Format Issue' }
+    };
+    return config[type] || config.UNMATCHED;
+  };
+  
+  const { color, icon: Icon, label } = getIssueConfig(issueType);
+  
+  return {
+    hasIssue: true,
+    originalDescription: description,
+    issueType,
+    issueMessage,
+    color,
+    icon: Icon,
+    label
+  };
+};
+
+// Component to display transaction with issues
+const TransactionWithIssue = ({ transaction }) => {
+  const issueInfo = extractIssueInfo(transaction);
+  
+  if (!issueInfo.hasIssue) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <FileText className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {issueInfo.originalDescription || 'No description'}
+            </p>
+            {transaction.notes && !transaction.notes.includes('[VALIDATION ISSUE:') && 
+             !transaction.notes.includes('validation issue') && 
+             !transaction.notes.includes('validation failed') && (
+              <p className="text-xs text-gray-500 mt-1">{transaction.notes}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  const { issueType, issueMessage, originalDescription, color, icon: Icon, label } = issueInfo;
+  const colorClasses = {
+    gray: 'bg-gray-50 text-gray-700 border-gray-200',
+    rose: 'bg-rose-50 text-rose-700 border-rose-200',
+    amber: 'bg-amber-50 text-amber-700 border-amber-200',
+    purple: 'bg-purple-50 text-purple-700 border-purple-200'
+  };
+  
+  return (
+    <div className="space-y-3">
+      {/* Original Description */}
+      <div className="flex items-start gap-3">
+        <FileText className="w-5 h-5 text-gray-500 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900">
+            {originalDescription || 'No original description'}
+          </p>
+        </div>
+      </div>
+      
+      {/* Issue Details from Notes */}
+      <div className={`p-3 rounded-lg border ${colorClasses[color]}`}>
+        <div className="flex items-start gap-3">
+          <div className={`p-1.5 rounded-md bg-white border ${
+            color === 'gray' ? 'border-gray-300' :
+            color === 'rose' ? 'border-rose-300' :
+            color === 'amber' ? 'border-amber-300' :
+            'border-purple-300'
+          }`}>
+            <Icon className={`w-4 h-4 ${
+              color === 'gray' ? 'text-gray-600' :
+              color === 'rose' ? 'text-rose-600' :
+              color === 'amber' ? 'text-amber-600' :
+              'text-purple-600'
+            }`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                color === 'gray' ? 'bg-gray-100 text-gray-800' :
+                color === 'rose' ? 'bg-rose-100 text-rose-800' :
+                color === 'amber' ? 'bg-amber-100 text-amber-800' :
+                'bg-purple-100 text-purple-800'
+              }`}>
+                {label}
+              </span>
+              {issueInfo.issueType === 'INVALID' && (
+                <span className="text-xs font-medium text-rose-800">⚠️ Requires Fixing</span>
+              )}
+              {issueInfo.issueType === 'DUPLICATE' && (
+                <span className="text-xs font-medium text-gray-800">⛔ Already Exists</span>
+              )}
+            </div>
+            <p className="text-sm font-medium">{issueMessage}</p>
+            {transaction.notes && issueMessage !== transaction.notes && (
+              <p className="text-xs mt-1 opacity-75">Full notes: {transaction.notes}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Issue type badge component
+const IssueTypeBadge = ({ issueType }) => {
+  const config = {
+    DUPLICATE: {
+      label: 'Duplicate',
+      color: 'bg-gray-100 text-gray-800 border border-gray-200',
+      icon: DatabaseIcon
+    },
+    INVALID: {
+      label: 'Invalid',
+      color: 'bg-rose-100 text-rose-800 border border-rose-200',
+      icon: FileX
+    },
+    UNMATCHED: {
+      label: 'Unmatched',
+      color: 'bg-amber-100 text-amber-800 border border-amber-200',
+      icon: User
+    },
+    FORMAT: {
+      label: 'Format',
+      color: 'bg-purple-100 text-purple-800 border border-purple-200',
+      icon: Calendar
+    }
+  };
+  
+  const { label, color, icon: Icon } = config[issueType] || config.UNMATCHED;
+  
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${color}`}>
+      <Icon className="w-3 h-3" />
+      {label}
+    </span>
+  );
 };
 
 // Helper function to show SweetAlert2 file upload modal
@@ -207,7 +616,6 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
 
   const FileUploadView = () => (
     <div className="space-y-6">
-      {/* Drag and Drop Area */}
       <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-300 transition-colors bg-gray-50/50">
         <input
           type="file"
@@ -216,6 +624,7 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
           onChange={(e) => {
             const file = e.target.files[0];
             if (file) {
+              selectedFile = file;
               processFile(file);
             }
           }}
@@ -226,14 +635,14 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
             <div className="p-4 bg-blue-50 rounded-full mb-4">
               <UploadCloud className="w-12 h-12 text-blue-500" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">
               {selectedFile ? 'File Selected' : 'Drag & Drop or Click to Upload'}
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 mb-4 text-center">
               {selectedFile ? selectedFile.name : 'Supports CSV, Excel, JSON files up to 10MB'}
             </p>
             {!selectedFile && (
-              <div className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium">
+              <div className="px-6 py-3 bg-blue-500 text-white rounded-lg font-medium mx-auto">
                 Browse Files
               </div>
             )}
@@ -241,17 +650,16 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
         </label>
       </div>
 
-      {/* File Preview */}
       {previewData && (
         <div className="space-y-4">
-          <h4 className="font-semibold text-gray-900">File Preview</h4>
+          <h4 className="font-semibold text-gray-900 text-center">File Preview</h4>
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 {getFileIcon(selectedFile.name)}
                 <div>
                   <h5 className="font-medium text-gray-800">{selectedFile.name}</h5>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 text-center">
                     {(selectedFile.size / 1024).toFixed(2)} KB • {previewData.rowCount} records
                   </p>
                 </div>
@@ -259,7 +667,7 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
             </div>
             <div className="mt-3">
               <div className="bg-white rounded border border-gray-300 p-3 max-h-60 overflow-y-auto">
-                <pre className="text-sm text-gray-700 font-mono whitespace-pre-wrap">
+                <pre className="text-sm text-gray-700 font-mono whitespace-pre-wrap text-center">
                   {previewData.content}
                 </pre>
               </div>
@@ -267,25 +675,6 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
           </div>
         </div>
       )}
-
-      {/* File Format Info */}
-      <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-        <h4 className="font-semibold text-blue-800 mb-2">Supported Formats</h4>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="flex items-center gap-2 p-2 bg-white rounded">
-            <CSVIcon className="w-4 h-4 text-emerald-500" />
-            <span className="text-sm">CSV</span>
-          </div>
-          <div className="flex items-center gap-2 p-2 bg-white rounded">
-            <ExcelIcon className="w-4 h-4 text-green-500" />
-            <span className="text-sm">Excel</span>
-          </div>
-          <div className="flex items-center gap-2 p-2 bg-white rounded">
-            <FileText className="w-4 h-4 text-amber-500" />
-            <span className="text-sm">JSON</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 
@@ -297,13 +686,28 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
       result.status === 'INVALID' || result.status === 'UNMATCHED'
     );
 
+    // Count different issue types
+    const issueCounts = invalidResults.reduce((acc, result) => {
+      let issueType = 'UNMATCHED';
+      const message = result.validationMessage?.toLowerCase() || '';
+      
+      if (message.includes('missing') || message.includes('invalid') || message.includes('required')) {
+        issueType = 'INVALID';
+      } else if (message.includes('format') || message.includes('date')) {
+        issueType = 'FORMAT';
+      }
+      
+      acc[issueType] = (acc[issueType] || 0) + 1;
+      return acc;
+    }, {});
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Validation Results</h3>
+          <h3 className="text-lg font-semibold text-gray-900 text-center">Validation Results</h3>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">
-              {validCount} valid • {invalidCount} invalid
+            <span className="text-sm font-medium text-gray-700 text-center">
+              {validCount} valid • {invalidCount} with issues
             </span>
             {invalidCount > 0 && (
               <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
@@ -316,18 +720,34 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4">
           <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-            <p className="text-xs text-emerald-700">Valid Transactions</p>
-            <p className="text-2xl font-bold text-emerald-800">{validCount}</p>
-            <p className="text-xs text-emerald-600">
+            <p className="text-xs text-emerald-700 text-center">Valid Transactions</p>
+            <p className="text-2xl font-bold text-emerald-800 text-center">{validCount}</p>
+            <p className="text-xs text-emerald-600 text-center">
               {invalidCount === 0 ? 'Ready to import' : 'Will be auto-matched'}
             </p>
           </div>
           <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-            <p className="text-xs text-amber-700">Invalid Transactions</p>
-            <p className="text-2xl font-bold text-amber-800">{invalidCount}</p>
-            <p className="text-xs text-amber-600">
-              {invalidCount === 0 ? 'No issues found' : 'Must be resolved first'}
+            <p className="text-xs text-amber-700 text-center">Transactions with Issues</p>
+            <p className="text-2xl font-bold text-amber-800 text-center">{invalidCount}</p>
+            <p className="text-xs text-amber-600 text-center">
+              {invalidCount === 0 ? 'No issues found' : 'Will appear in Unmatched tab'}
             </p>
+          </div>
+        </div>
+
+        {/* Duplicate warning */}
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <DatabaseIcon className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div>
+              <h5 className="font-semibold text-blue-800 mb-1 text-center">
+                Duplicate Protection Enabled
+              </h5>
+              <p className="text-sm text-blue-700 text-center">
+                Any transactions that already exist in the database will be automatically skipped.
+                Only unique transactions will be imported.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -337,166 +757,118 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
             <div className="flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
               <div>
-                <h5 className="font-semibold text-emerald-800 mb-1">
+                <h5 className="font-semibold text-emerald-800 mb-1 text-center">
                   Validation Successful! ✅
                 </h5>
-                <p className="text-sm text-emerald-700">
+                <p className="text-sm text-emerald-700 text-center">
                   All {validCount} transactions are valid and ready to import.
-                  Click "Proceed with Import" to upload the file to the database.
+                  Duplicates will be automatically skipped.
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Issues List - Show ALL issues */}
+        {/* Issues List - Show when there are issues */}
         {invalidCount > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-gray-900">
-                All Issues Found ({invalidResults.length})
+              <h4 className="font-semibold text-gray-900 text-center">
+                Issues Found ({invalidResults.length})
               </h4>
-              <span className="text-xs text-gray-500">
-                Fix these issues before importing
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 text-center">
+                  These will appear in the Unmatched tab
+                </span>
+              </div>
             </div>
             
+            {/* Issue breakdown */}
+            {Object.keys(issueCounts).length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                {Object.entries(issueCounts).map(([type, count]) => (
+                  <div key={type} className={`p-3 rounded-lg border ${
+                    type === 'INVALID' ? 'bg-rose-50 border-rose-200' :
+                    type === 'FORMAT' ? 'bg-purple-50 border-purple-200' :
+                    'bg-amber-50 border-amber-200'
+                  }`}>
+                    <p className="text-xs font-medium mb-1 text-center">
+                      {type === 'INVALID' ? 'Invalid' :
+                       type === 'FORMAT' ? 'Format Issues' :
+                       'Unmatched'}
+                    </p>
+                    <p className="text-xl font-bold text-center">{count}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             {/* Warning banner when issues exist */}
-            <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-600 mt-0.5 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
                 <div>
-                  <h5 className="font-semibold text-rose-800 mb-1">
-                    {invalidCount} Issue{invalidCount !== 1 ? 's' : ''} Need Attention
+                  <h5 className="font-semibold text-amber-800 mb-1 text-center">
+                    {invalidCount} Transaction{invalidCount !== 1 ? 's' : ''} Have Issues
                   </h5>
-                  <p className="text-sm text-rose-700">
-                    You must resolve all validation issues before uploading the file.
-                    The import button will remain disabled until all issues are fixed.
+                  <p className="text-sm text-amber-700 text-center">
+                    These transactions will be imported but marked as UNVERIFIED.
+                    The issues will be added to their description for easy reference.
+                    You can find and fix them in the <strong>Unmatched tab</strong> after import.
                   </p>
                 </div>
               </div>
             </div>
             
-            {/* Issues table */}
+            {/* Quick preview of issues */}
             <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <div className="max-h-96 overflow-y-auto">
-                  <table className="w-full min-w-full">
-                    <thead className="bg-gray-100 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Row #</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Amount</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Issue Description</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {invalidResults.map((result, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-mono whitespace-nowrap">#{index + 1}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <code className="text-xs font-mono bg-gray-200 px-2 py-1 rounded truncate max-w-xs inline-block">
+              <div className="p-3 bg-gray-100 border-b border-gray-200">
+                <h5 className="font-medium text-gray-900 text-center">Quick Preview of Issues:</h5>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full">
+                  <tbody className="divide-y divide-gray-200">
+                    {invalidResults.slice(0, 5).map((result, index) => {
+                      let issueType = 'UNMATCHED';
+                      const message = result.validationMessage?.toLowerCase() || '';
+                      if (message.includes('missing') || message.includes('invalid') || message.includes('required')) {
+                        issueType = 'INVALID';
+                      } else if (message.includes('format') || message.includes('date')) {
+                        issueType = 'FORMAT';
+                      }
+                      
+                      return (
+                        <tr key={index} className="hover:bg-gray-100">
+                          <td className="px-3 py-2 text-xs font-mono text-center">#{index + 1}</td>
+                          <td className="px-3 py-2 text-center">
+                            <code className="text-xs font-mono bg-gray-200 px-1.5 py-0.5 rounded">
                               {result.bankReference || 'N/A'}
                             </code>
                           </td>
-                          <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
-                            KSh {result.amount?.toLocaleString('en-KE') || '0'}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              result.status === 'INVALID' 
+                          <td className="px-3 py-2 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              issueType === 'INVALID' 
                                 ? 'bg-rose-100 text-rose-800'
-                                : 'bg-gray-100 text-gray-800'
+                                : issueType === 'FORMAT'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-amber-100 text-amber-800'
                             }`}>
-                              {result.status}
+                              {issueType}
                             </span>
                           </td>
-                          <td className="px-4 py-3">
-                            <p className="text-sm font-medium text-gray-900 mb-1">{result.validationMessage}</p>
-                            {result.description && (
-                              <p className="text-xs text-gray-500 truncate max-w-md">
-                                {result.description}
-                              </p>
-                            )}
-                            {result.errors && (
-                              <div className="mt-1">
-                                {Object.entries(result.errors).map(([key, value], idx) => (
-                                  <p key={idx} className="text-xs text-rose-600">
-                                    • {key}: {value}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
+                          <td className="px-3 py-2 text-xs truncate max-w-xs text-center">
+                            {result.validationMessage}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Warning */}
-        {warning && (
-          <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
-              <p className="text-sm text-amber-700">{warning}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Resolution Instructions - Enhanced */}
-        {invalidCount > 0 && (
-          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-amber-800 mb-2">How to Resolve These Issues</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <h5 className="text-sm font-medium text-amber-800 mb-1">For INVALID transactions:</h5>
-                    <ul className="text-xs text-amber-700 space-y-1">
-                      <li className="flex items-start gap-1">
-                        <span>•</span>
-                        <span>Fix in source file and re-upload</span>
-                      </li>
-                      <li className="flex items-start gap-1">
-                        <span>•</span>
-                        <span>Check for missing required fields</span>
-                      </li>
-                      <li className="flex items-start gap-1">
-                        <span>•</span>
-                        <span>Verify amount formats (no currency symbols)</span>
-                      </li>
-                    </ul>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {invalidResults.length > 5 && (
+                  <div className="p-2 text-center text-xs text-gray-500">
+                    Showing 5 of {invalidResults.length} issues
                   </div>
-                  <div>
-                    <h5 className="text-sm font-medium text-amber-800 mb-1">For UNMATCHED transactions:</h5>
-                    <ul className="text-xs text-amber-700 space-y-1">
-                      <li className="flex items-start gap-1">
-                        <span>•</span>
-                        <span>Will appear in "Unmatched" tab for manual matching</span>
-                      </li>
-                      <li className="flex items-start gap-1">
-                        <span>•</span>
-                        <span>Check student name/ID references</span>
-                      </li>
-                      <li className="flex items-start gap-1">
-                        <span>•</span>
-                        <span>Verify payment dates are valid</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-amber-200">
-                  <p className="text-sm text-amber-800 font-medium">
-                    After fixing issues, click "Back" and re-upload the corrected file.
-                  </p>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -569,12 +941,21 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
 
   const updateModal = () => {
     MySwal.update({
-      html: showValidationResults ? <ValidationResultsView /> : <FileUploadView />
+      html: showValidationResults ? <ValidationResultsView /> : <FileUploadView />,
+      confirmButtonText: showValidationResults 
+        ? (invalidCount === 0 ? 'Proceed with Import' : 'Import Anyway') 
+        : 'Validate File',
+      confirmButtonColor: showValidationResults 
+        ? (invalidCount === 0 ? '#10b981' : '#f59e0b')
+        : '#3b82f6',
+      cancelButtonText: showValidationResults ? 'Back' : 'Cancel',
+      showCancelButton: true,
+      showConfirmButton: true
     });
   };
 
   return showModalWithLockedBackground({
-    title: <div className="flex items-center gap-2">
+    title: <div className="flex items-center gap-2 justify-center">
       <Upload className="w-6 h-6 text-blue-600" />
       <span>{showValidationResults ? 'Import Validation' : 'Import Bank Statement'}</span>
     </div>,
@@ -582,21 +963,18 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
     showCancelButton: true,
     showConfirmButton: true,
     confirmButtonText: showValidationResults 
-      ? (invalidCount === 0 ? 'Proceed with Import' : 'Review Issues') 
+      ? (invalidCount === 0 ? 'Proceed with Import' : 'Import Anyway') 
       : 'Validate File',
     cancelButtonText: showValidationResults ? 'Back' : 'Cancel',
     confirmButtonColor: showValidationResults 
       ? (invalidCount === 0 ? '#10b981' : '#f59e0b')
       : '#3b82f6',
     customClass: {
-      popup: 'rounded-2xl border border-gray-200 shadow-xl w-full max-w-2xl',
-      title: 'text-lg font-bold flex items-center gap-2',
-      confirmButton: `px-4 py-2 rounded-lg font-medium ${
-        showValidationResults && invalidCount > 0 
-          ? 'opacity-50 cursor-not-allowed' 
-          : ''
-      }`,
-      cancelButton: 'px-4 py-2 rounded-lg font-medium'
+      popup: 'rounded-2xl border border-gray-200 shadow-xl w-full max-w-4xl',
+      title: 'text-lg font-bold flex items-center gap-2 justify-center',
+      confirmButton: 'px-6 py-3 rounded-lg font-medium mx-auto',
+      cancelButton: 'px-6 py-3 rounded-lg font-medium',
+      htmlContainer: 'text-center'
     },
     preConfirm: async () => {
       if (!showValidationResults) {
@@ -610,6 +988,11 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
           const formData = new FormData();
           formData.append('file', selectedFile);
           formData.append('bankAccount', 'default');
+          
+          // Pass validation results if available
+          if (validationData) {
+            formData.append('validationResults', JSON.stringify(validationData));
+          }
           
           const response = await transactionApi.post('/import/validate', formData, {
             headers: {
@@ -628,13 +1011,7 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
           validCount = validationData.validCount || (validationData.totalTransactions - invalidCount);
           
           // Update modal with new state
-          MySwal.update({
-            html: <ValidationResultsView />,
-            confirmButtonText: invalidCount === 0 ? 'Proceed with Import' : 'Review Issues',
-            confirmButtonColor: invalidCount === 0 ? '#10b981' : '#f59e0b',
-            showCancelButton: true,
-            cancelButtonText: 'Back'
-          });
+          updateModal();
           
           return false; // Don't close modal
         } catch (error) {
@@ -642,16 +1019,25 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
           return false;
         }
       } else {
-        // Step 2: Proceed with import (only if no invalid issues)
+        // Step 2: Proceed with import
         if (invalidCount > 0) {
-          // If there are issues, show a warning and don't proceed
-          MySwal.showValidationMessage('Please fix validation issues before importing');
-          return false;
+          // If there are issues, show a warning but allow import
+          const result = await showConfirmDialog(
+            'Import Transactions with Issues',
+            `You are about to import ${validCount} valid transactions and ${invalidCount} transactions with issues. 
+            Transactions with issues will be marked as UNVERIFIED and appear in the Unmatched tab. Continue?`,
+            'Proceed with Import',
+            'Cancel'
+          );
+          
+          if (!result.isConfirmed) {
+            return false;
+          }
         }
         
-        // Only proceed if no invalid issues
+        // Import the file
         if (onImportComplete && selectedFile) {
-          await onImportComplete(selectedFile);
+          await onImportComplete(selectedFile, validationData);
         }
         return true; // Close modal
       }
@@ -663,7 +1049,7 @@ const showFileUploadModal = (onFileSelect, onValidationComplete, onImportComplet
   });
 };
 
-// Payment method mapping for bank transactions
+// Payment method mapping
 const getPaymentMethodFromBankTransaction = (description) => {
   const desc = description?.toLowerCase() || '';
   if (desc.includes('upi') || desc.includes('qr')) return 'upi';
@@ -796,10 +1182,7 @@ const VerifiedStatusIndicator = ({ isVerified }) => {
   );
 };
 
-/**
- * Transform backend API response to frontend expected format
- * Converts flat fields to nested student object structure
- */
+// Transform backend API response
 const transformTransactionResponse = (apiData) => {
   if (!Array.isArray(apiData)) {
     console.warn('transformTransactionResponse: Expected array, got', typeof apiData);
@@ -807,42 +1190,31 @@ const transformTransactionResponse = (apiData) => {
   }
 
   return apiData.map(item => {
-    // If it's already in the correct format (has nested student), return as-is
     if (item.student && typeof item.student === 'object') {
       return item;
     }
 
-    // Create a copy to avoid mutating the original
     const transformed = { ...item };
     
-    // Check if we have student-related flat fields
     const hasStudentData = item.studentId || item.studentName;
     
     if (hasStudentData) {
-      // Build nested student object from flat fields
       transformed.student = {
-        // Basic student info
         id: item.studentId,
         studentId: item.studentStudentId || item.studentCode || item.studentId,
         fullName: item.studentName,
         grade: item.studentGrade,
-        
-        // Term assignment fields (move from transaction root to student object)
         hasTermAssignments: item.hasTermAssignments !== undefined 
           ? item.hasTermAssignments 
           : false,
         termAssignmentCount: item.termAssignmentCount !== undefined 
           ? item.termAssignmentCount 
           : 0,
-        
-        // Fee fields (move from transaction root to student object)
         totalFee: item.studentTotalFee,
         paidAmount: item.studentPaidAmount,
         pendingAmount: item.studentPendingAmount,
         feeStatus: item.studentFeeStatus,
         paymentPercentage: item.studentPaymentPercentage,
-        
-        // Contact fields
         phone: item.studentPhone,
         email: item.studentEmail,
         emergencyContactPhone: item.studentEmergencyContactPhone,
@@ -850,7 +1222,6 @@ const transformTransactionResponse = (apiData) => {
         contact: item.studentPhone || item.studentEmergencyContactPhone
       };
 
-      // Clean up: remove flat fields that are now nested
       const fieldsToRemove = [
         'studentId', 'studentName', 'studentGrade',
         'hasTermAssignments', 'termAssignmentCount',
@@ -871,9 +1242,7 @@ const transformTransactionResponse = (apiData) => {
   });
 };
 
-/**
- * Transform student list from backend to frontend format
- */
+// Transform student list from backend
 const transformStudentResponse = (apiData) => {
   if (!Array.isArray(apiData)) {
     console.warn('transformStudentResponse: Expected array, got', typeof apiData);
@@ -898,8 +1267,6 @@ const transformStudentResponse = (apiData) => {
       : Math.max(0, (dto.totalFee || 0) - (dto.paidAmount || 0)),
     feeStatus: dto.feeStatus || 'PENDING',
     contact: dto.phone || dto.emergencyContactPhone,
-    
-    // Term assignment fields from backend
     hasTermAssignments: dto.hasTermAssignments || false,
     termAssignmentCount: dto.termAssignmentCount || 0
   }));
@@ -909,13 +1276,14 @@ const transformStudentResponse = (apiData) => {
 // API SERVICE
 // ============================================
 
-// API Service functions
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+
 const transactionApi = axios.create({
-  baseURL: 'http://localhost:8080/api/transactions',
+  baseURL: `${API_BASE_URL}/transactions`, // ✅ Uses your network IP from .env
 });
 
 const feeManagementApi = axios.create({
-  baseURL: 'http://localhost:8080/api/fees',
+  baseURL: `${API_BASE_URL}/fees`, // ✅ Uses your network IP from .env
 });
 
 // Add request interceptor to add auth token
@@ -984,121 +1352,6 @@ const handleError = (error) => {
   }
 };
 
-// Show validation issues modal
-const showValidationIssuesModal = (validationData) => {
-  const { validationResults, invalidCount } = validationData;
-  const invalidResults = validationResults.filter(
-    result => result.status === 'INVALID' || result.status === 'UNMATCHED'
-  );
-
-  return showModalWithLockedBackground({
-    title: <div className="flex items-center gap-2">
-      <AlertOctagon className="w-6 h-6 text-amber-600" />
-      <span>Validation Issues ({invalidCount})</span>
-    </div>,
-    html: (
-      <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-        {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-            <p className="text-xs text-amber-700 mb-1">Total Issues</p>
-            <p className="text-2xl font-bold text-amber-800">{invalidCount}</p>
-          </div>
-          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <p className="text-xs text-blue-700 mb-1">Invalid</p>
-            <p className="text-2xl font-bold text-blue-800">
-              {invalidResults.filter(r => r.status === 'INVALID').length}
-            </p>
-          </div>
-          <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <p className="text-xs text-gray-700 mb-1">Unmatched</p>
-            <p className="text-2xl font-bold text-gray-800">
-              {invalidResults.filter(r => r.status === 'UNMATCHED').length}
-            </p>
-          </div>
-        </div>
-
-        {/* Issues Table */}
-        <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Row #</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Reference</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Amount</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Issue</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {invalidResults.slice(0, 20).map((result, index) => (
-                  <tr key={index} className="hover:bg-gray-100">
-                    <td className="px-4 py-3 text-sm font-mono">#{index + 1}</td>
-                    <td className="px-4 py-3">
-                      <code className="text-xs font-mono bg-gray-200 px-2 py-1 rounded">
-                        {result.bankReference || 'N/A'}
-                      </code>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium">
-                      KSh {result.amount?.toLocaleString('en-KE') || '0'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        result.status === 'INVALID' 
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {result.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <p className="font-medium">{result.validationMessage}</p>
-                      <p className="text-xs text-gray-500 truncate max-w-xs">
-                        {result.description || 'No description'}
-                      </p>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {invalidCount > 20 && (
-          <div className="text-center text-sm text-gray-500">
-            Showing 20 of {invalidCount} issues. Remaining issues will be marked as UNVERIFIED.
-          </div>
-        )}
-
-        {/* Resolution Instructions */}
-        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
-            <div>
-              <h4 className="font-semibold text-amber-800 mb-2">How to Resolve</h4>
-              <ul className="text-sm text-amber-700 space-y-1">
-                <li>• Invalid transactions: Fix in source file and re-upload</li>
-                <li>• Unmatched transactions: Will appear in "Unmatched" tab for manual matching</li>
-                <li>• Ensure unique reference numbers</li>
-                <li>• Check date formats (YYYY-MM-DD or DD/MM/YYYY)</li>
-                <li>• Remove currency symbols from amount columns</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
-    width: 800,
-    showConfirmButton: false,
-    showCloseButton: true,
-    customClass: {
-      popup: 'rounded-2xl border border-gray-200 shadow-xl',
-      title: 'text-lg font-bold flex items-center gap-2'
-    }
-  });
-};
-
 const SimplePagination = ({ currentPage, onPageChange, hasNextPage, hasPreviousPage }) => {
   return (
     <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-gray-200 bg-white">
@@ -1152,6 +1405,7 @@ const Transactions = () => {
   const [selectedTransactions, setSelectedTransactions] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [activeTab, setActiveTab] = useState('unverified');
+  const [issueFilter, setIssueFilter] = useState('ALL');
   
   const [currentPage, setCurrentPage] = useState(1);
   const MAX_PAGE_ROWS = 20;
@@ -1205,7 +1459,7 @@ const Transactions = () => {
     }
   };
 
-  // UPDATED FETCH FUNCTION WITH DATA TRANSFORMATION
+  // UPDATED FETCH FUNCTION WITH DUPLICATE HANDLING
   const fetchAllData = useCallback(async (refreshCache = false) => {
     setIsLoading(true);
     
@@ -1218,14 +1472,14 @@ const Transactions = () => {
       // Step 2: Fetch statistics FIRST
       await fetchStatistics();
       
-      // Step 3: Fetch ALL bank transactions and TRANSFORM the data
+      // Step 3: Fetch ALL bank transactions
       try {
         const bankResponse = await transactionApi.get('/bank?all=true');
         const allBankData = handleResponse(bankResponse);
         
         console.log('🔍 Raw API response (first transaction):', allBankData[0]);
         
-        // TRANSFORM THE DATA: Convert flat fields to nested structure
+        // TRANSFORM THE DATA
         const transformedBankData = transformTransactionResponse(allBankData);
         
         console.log('✅ Transformed data (first transaction):', transformedBankData[0]);
@@ -1249,16 +1503,15 @@ const Transactions = () => {
         }
       }
 
-      // Step 4: Fetch ALL students and transform the data
+      // Step 4: Fetch ALL students
       try {
-        const studentsResponse = await axios.get('http://localhost:8080/api/v1/students', {
+      const studentsResponse = await axios.get(`${API_BASE_URL}/v1/students`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         });
         const studentsData = studentsResponse.data;
         
-        // Transform student data
         const formattedStudents = transformStudentResponse(
           Array.isArray(studentsData) ? studentsData : []
         );
@@ -1292,7 +1545,7 @@ const Transactions = () => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // Filter transactions based on active tab, search, and pagination
+  // Filter transactions
   const filteredTransactions = useMemo(() => {
     let transactions = [...bankStatements];
     
@@ -1300,6 +1553,14 @@ const Transactions = () => {
       transactions = bankStatements.filter(stmt => 
         stmt.status === 'UNVERIFIED' || stmt.status === 'PENDING'
       );
+      
+      // Apply issue type filter
+      if (issueFilter !== 'ALL') {
+        transactions = transactions.filter(transaction => {
+          const issueInfo = extractIssueInfo(transaction);
+          return issueInfo.hasIssue && issueInfo.issueType === issueFilter;
+        });
+      }
     } else if (activeTab === 'matched') {
       transactions = bankStatements.filter(stmt => 
         stmt.status === 'MATCHED'
@@ -1323,9 +1584,14 @@ const Transactions = () => {
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
       transactions = transactions.filter(transaction => {
+        const issueInfo = extractIssueInfo(transaction);
+        const originalDesc = issueInfo.originalDescription || '';
+        const issueMessage = issueInfo.issueMessage || '';
+        
         return (
           (transaction.student?.fullName || '').toLowerCase().includes(searchLower) ||
-          (transaction.description || '').toLowerCase().includes(searchLower) ||
+          originalDesc.toLowerCase().includes(searchLower) ||
+          issueMessage.toLowerCase().includes(searchLower) ||
           (transaction.bankReference || '').toLowerCase().includes(searchLower) ||
           String(transaction.amount || '').includes(searchQuery)
         );
@@ -1349,14 +1615,14 @@ const Transactions = () => {
       hasPreviousPage: currentPage > 1,
       pageData: transactions.slice(startIndex, endIndex)
     };
-  }, [activeTab, studentIdParam, searchQuery, bankStatements, currentPage]);
+  }, [activeTab, studentIdParam, searchQuery, bankStatements, currentPage, issueFilter]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, issueFilter]);
 
-  // Get student data (now works with nested structure)
+  // Get student data
   const getStudentData = (studentId) => {
     return students.find(s => s.id === studentId);
   };
@@ -1385,7 +1651,7 @@ const Transactions = () => {
     }
   };
 
-  // View term assignments for a student - using SweetAlert2
+  // View term assignments
   const handleViewTermAssignments = async (student) => {
     if (!student) return;
     
@@ -1394,7 +1660,6 @@ const Transactions = () => {
     setIsLoading(true);
     
     try {
-      // ONLY fetch term assignments data
       console.log('📞 Calling term assignments API for student ID:', student.id);
       
       const response = await feeManagementApi.get(`/student/${student.id}/term-assignments`);
@@ -1402,29 +1667,20 @@ const Transactions = () => {
       
       console.log('✅ Term assignments API response:', data);
       
-      // Extract term assignments from the response
       let termAssignments = [];
       
-      // Handle different response formats
       if (data && data.data && Array.isArray(data.data.termAssignments)) {
         termAssignments = data.data.termAssignments;
-        console.log('📊 Got term assignments from data.data.termAssignments:', termAssignments.length);
       } else if (Array.isArray(data)) {
         termAssignments = data;
-        console.log('📊 Got term assignments from array response:', termAssignments.length);
       } else if (data && Array.isArray(data.termAssignments)) {
         termAssignments = data.termAssignments;
-        console.log('📊 Got term assignments from data.termAssignments:', termAssignments.length);
-      } else {
-        console.log('⚠️ No term assignments found in response structure:', data);
       }
       
-      // Calculate totals from term assignments
       const totalTermFee = termAssignments.reduce((sum, term) => sum + (Number(term.totalFee) || 0), 0);
       const totalTermPaid = termAssignments.reduce((sum, term) => sum + (Number(term.paidAmount) || 0), 0);
       const totalTermPending = termAssignments.reduce((sum, term) => sum + (Number(term.pendingAmount) || 0), 0);
       
-      // Use student data as fallback
       const hasTermAssignments = termAssignments.length > 0;
       const termAssignmentCount = termAssignments.length;
       
@@ -1439,21 +1695,21 @@ const Transactions = () => {
 
       // Show as SweetAlert2 popup
       await showModalWithLockedBackground({
-        title: <div className="flex items-center gap-2">
+        title: <div className="flex items-center gap-2 justify-center">
           <BookOpen className="w-6 h-6 text-gray-900" />
           <span>Term Assignments - {student.fullName}</span>
         </div>,
         html: (
-          <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
+          <div className="text-center space-y-6 max-h-[70vh] overflow-y-auto">
             {/* Student Information */}
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-2">
                     <GraduationCap className="w-5 h-5 text-blue-600" />
-                    <h3 className="font-bold text-lg text-gray-900">Student Information</h3>
+                    <h3 className="font-bold text-lg text-gray-900 text-center">Student Information</h3>
                   </div>
-                  <p className="text-sm text-gray-600">{student.grade} • ID: {student.studentId}</p>
+                  <p className="text-sm text-gray-600 text-center">{student.grade} • ID: {student.studentId}</p>
                 </div>
                 <div className={`px-3 py-1.5 rounded-lg ${
                   hasTermAssignments 
@@ -1475,26 +1731,26 @@ const Transactions = () => {
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Total Terms</p>
-                  <p className="text-lg font-bold text-gray-900">
+                  <p className="text-xs text-gray-500 text-center">Total Terms</p>
+                  <p className="text-lg font-bold text-gray-900 text-center">
                     {termAssignmentCount}
                   </p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Total Fee</p>
-                  <p className="text-lg font-bold text-gray-900">
+                  <p className="text-xs text-gray-500 text-center">Total Fee</p>
+                  <p className="text-lg font-bold text-gray-900 text-center">
                     {formatCurrency(student.totalFee || totalTermFee || 0)}
                   </p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Paid Amount</p>
-                  <p className="text-lg font-bold text-gray-900">
+                  <p className="text-xs text-gray-500 text-center">Paid Amount</p>
+                  <p className="text-lg font-bold text-gray-900 text-center">
                     {formatCurrency(student.paidAmount || totalTermPaid || 0)}
                   </p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">Pending</p>
-                  <p className="text-lg font-bold text-amber-600">
+                  <p className="text-xs text-gray-500 text-center">Pending</p>
+                  <p className="text-lg font-bold text-amber-600 text-center">
                     {formatCurrency(student.pendingAmount || totalTermPending || 0)}
                   </p>
                 </div>
@@ -1505,8 +1761,8 @@ const Transactions = () => {
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-amber-800">No Term Assignments</h4>
-                      <p className="text-xs text-amber-700 mt-1">
+                      <h4 className="text-sm font-semibold text-amber-800 text-center">No Term Assignments</h4>
+                      <p className="text-xs text-amber-700 mt-1 text-center">
                         This student has not been assigned to any academic terms.
                       </p>
                     </div>
@@ -1520,9 +1776,9 @@ const Transactions = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-5 h-5 text-gray-700" />
-                  <h3 className="font-semibold text-gray-900">Term-wise Fee Breakdown</h3>
+                  <h3 className="font-semibold text-gray-900 text-center">Term-wise Fee Breakdown</h3>
                 </div>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 text-center">
                   {termAssignmentCount} term(s) assigned
                 </span>
               </div>
@@ -1530,8 +1786,8 @@ const Transactions = () => {
               {!hasTermAssignments ? (
                 <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl">
                   <Book className="w-12 h-12 text-gray-400 mx-auto" />
-                  <h4 className="mt-4 text-lg font-semibold text-gray-900">No Term Assignments Found</h4>
-                  <p className="text-gray-600 mt-2">
+                  <h4 className="mt-4 text-lg font-semibold text-gray-900 text-center">No Term Assignments Found</h4>
+                  <p className="text-gray-600 mt-2 text-center">
                     This student has not been assigned to any academic terms.
                   </p>
                 </div>
@@ -1546,27 +1802,27 @@ const Transactions = () => {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <School className="w-4 h-4 text-blue-600" />
-                            <h4 className="font-medium text-gray-900">
+                            <h4 className="font-medium text-gray-900 text-center">
                               {term.termName || `Term ${index + 1}`}
                             </h4>
                           </div>
 
                           <div className="grid grid-cols-3 gap-3">
                             <div>
-                              <p className="text-xs text-gray-500">Total Fee</p>
-                              <p className="text-sm font-bold text-gray-900">
+                              <p className="text-xs text-gray-500 text-center">Total Fee</p>
+                              <p className="text-sm font-bold text-gray-900 text-center">
                                 {formatCurrency(term.totalFee || 0)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500">Paid Amount</p>
-                              <p className="text-sm font-bold text-emerald-600">
+                              <p className="text-xs text-gray-500 text-center">Paid Amount</p>
+                              <p className="text-sm font-bold text-emerald-600 text-center">
                                 {formatCurrency(term.paidAmount || 0)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500">Pending</p>
-                              <p className="text-sm font-bold text-amber-600">
+                              <p className="text-xs text-gray-500 text-center">Pending</p>
+                              <p className="text-sm font-bold text-amber-600 text-center">
                                 {formatCurrency(term.pendingAmount || 0)}
                               </p>
                             </div>
@@ -1607,19 +1863,19 @@ const Transactions = () => {
             </div>
           </div>
         ),
-        width: 700,
+        width: 900, // Increased width
         showConfirmButton: false,
         showCloseButton: true,
         customClass: {
           popup: 'rounded-2xl border border-gray-200 shadow-xl',
-          title: 'text-lg font-bold flex items-center gap-2'
+          title: 'text-lg font-bold flex items-center gap-2 justify-center',
+          htmlContainer: 'text-center'
         }
       });
       
     } catch (error) {
       console.error('❌ Error in handleViewTermAssignments:', error);
       
-      // Show user-friendly error message
       await showErrorAlert(
         'Unable to Load Term Data',
         error.message || 'Could not retrieve term assignment information.'
@@ -1661,45 +1917,45 @@ const Transactions = () => {
         }
       }
 
-      const summaryHtml = (
-        <div className="text-left space-y-4">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-              <p className="text-xs text-emerald-700">Valid Students</p>
-              <p className="text-2xl font-bold text-emerald-800">{validCount}</p>
+      const summaryHtml = `
+        <div class="text-center space-y-4 max-w-4xl mx-auto">
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+              <p class="text-xs text-emerald-700 text-center">Valid Students</p>
+              <p class="text-2xl font-bold text-emerald-800 text-center">${validCount}</p>
             </div>
-            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-              <p className="text-xs text-amber-700">Invalid Students</p>
-              <p className="text-2xl font-bold text-amber-800">{invalidCount}</p>
+            <div class="p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <p class="text-xs text-amber-700 text-center">Invalid Students</p>
+              <p class="text-2xl font-bold text-amber-800 text-center">${invalidCount}</p>
             </div>
           </div>
 
-          {validCount > 0 && (
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800 font-medium">
-                Total Pending Amount: KSh {totalPendingAmount.toLocaleString('en-KE')}
+          ${validCount > 0 ? `
+            <div class="p-3 bg-blue-50 rounded-lg">
+              <p class="text-sm text-blue-800 font-medium text-center">
+                Total Pending Amount: KSh ${totalPendingAmount.toLocaleString('en-KE')}
               </p>
             </div>
-          )}
+          ` : ''}
 
-          {invalidCount > 0 && (
-            <div className="mt-4">
-              <h4 className="font-semibold text-amber-800 mb-2">Issues Found:</h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {validationResults
+          ${invalidCount > 0 ? `
+            <div class="mt-4">
+              <h4 class="font-semibold text-amber-800 mb-2 text-center">Issues Found:</h4>
+              <div class="space-y-2 max-h-60 overflow-y-auto">
+                ${validationResults
                   .filter(r => !r.result.success)
-                  .map((r, index) => (
-                    <div key={index} className="p-2 bg-amber-50 rounded border border-amber-200">
-                      <p className="text-sm font-medium text-gray-900">{r.student.fullName}</p>
-                      <p className="text-xs text-amber-700">{r.result.message}</p>
+                  .map((r, index) => `
+                    <div key="${index}" class="p-2 bg-amber-50 rounded border border-amber-200">
+                      <p class="text-sm font-medium text-gray-900 text-center">${r.student.fullName}</p>
+                      <p class="text-xs text-amber-700 text-center">${r.result.message}</p>
                     </div>
-                  ))
+                  `).join('')
                 }
               </div>
             </div>
-          )}
+          ` : ''}
         </div>
-      );
+      `;
 
       const result = await showConfirmDialog(
         'Bulk Validation Results',
@@ -1722,46 +1978,311 @@ const Transactions = () => {
     }
   };
 
-  // Handle file import using SweetAlert2 modal
-  const handleImportFile = () => {
-    showFileUploadModal(
-      null, // onFileSelect
-      null, // onValidationComplete
-      async (file) => {
-        setIsLoading(true);
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
+// UPDATED: Handle file import with proper response structure
+const handleImportFile = () => {
+  showFileUploadModal(
+    null,
+    null,
+    async (file, validationData) => {
+      setIsLoading(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('bankAccount', 'default');
+        
+        // Pass validation results if available
+        if (validationData) {
+          formData.append('validationResults', JSON.stringify(validationData));
+        }
+        
+        const response = await transactionApi.post('/import', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        
+        // Check the actual response structure
+        console.log('🔍 Full import response:', response.data);
+        
+        // Handle the response structure based on your backend
+        const responseData = response.data;
+        let message = '';
+        let savedTransactions = 0;
+        let duplicateCount = 0;
+        let duplicateRefs = [];
+        let importedTransactions = [];
+        
+        if (responseData.success === true) {
+          // Success response
+          if (responseData.data) {
+            const data = responseData.data;
+            const importStats = data.importStats || {};
+            
+            savedTransactions = importStats.savedTransactions || 0;
+            duplicateCount = importStats.duplicatesSkipped || 0;
+            duplicateRefs = importStats.duplicateReferences || [];
+            importedTransactions = data.transactions || [];
+            
+            message = responseData.message || '';
+          } else {
+            // Fallback if data structure is different
+            savedTransactions = responseData.savedTransactions || responseData.saved || 0;
+            duplicateCount = responseData.duplicatesSkipped || responseData.duplicateCount || 0;
+            duplicateRefs = responseData.duplicateReferences || [];
+            importedTransactions = responseData.transactions || [];
+            
+            // Construct message based on what we found
+            if (savedTransactions === 0 && duplicateCount > 0) {
+              message = `No new transactions imported. ${duplicateCount} duplicate transaction(s) were skipped.`;
+            } else if (savedTransactions > 0 && duplicateCount > 0) {
+              message = `Successfully imported ${savedTransactions} transactions (${duplicateCount} duplicates skipped)`;
+            } else if (savedTransactions > 0 && duplicateCount === 0) {
+              message = `Successfully imported ${savedTransactions} transactions`;
+            } else {
+              message = 'No transactions were imported.';
+            }
+          }
           
-          const response = await transactionApi.post('/import', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
+          console.log('📊 Import summary:', {
+            savedTransactions,
+            duplicateCount,
+            duplicateRefs,
+            message
           });
           
-          const importedData = handleResponse(response);
-          // Transform imported data
-          const transformedData = transformTransactionResponse(importedData);
-          setBankStatements(prev => [...transformedData, ...prev]);
-          setCurrentPage(1);
+          // Show appropriate message based on results
+          if (savedTransactions === 0 && duplicateCount > 0) {
+            // ALL transactions are duplicates
+            await showWarningAlert(
+              'No New Transactions',
+              `<div class="text-center max-w-4xl mx-auto">
+                <div class="flex items-start gap-3 mb-4">
+                  <div class="p-2 bg-amber-100 rounded-lg">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 4 3h8c2.5 0 4-1 4-3V7c0-2-1.5-3-4-3H8C5.5 4 4 5 4 7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 class="font-semibold text-amber-900 text-lg text-center">This bank statement is already in the system</h4>
+                    <p class="text-sm text-amber-700 mt-1 text-center">All ${duplicateCount} transactions already exist in the database.</p>
+                  </div>
+                </div>
+                
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-sm font-medium text-gray-900 text-center">What happened?</span>
+                  </div>
+                  <ul class="text-sm text-gray-600 space-y-1 pl-2">
+                    <li class="flex items-start gap-2">
+                      <div class="w-1.5 h-1.5 bg-gray-400 rounded-full mt-1.5"></div>
+                      <span>The file contains ${duplicateCount} transaction${duplicateCount !== 1 ? 's' : ''}</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <div class="w-1.5 h-1.5 bg-gray-400 rounded-full mt-1.5"></div>
+                      <span>All transaction references already exist in the database</span>
+                    </li>
+                    <li class="flex items-start gap-2">
+                      <div class="w-1.5 h-1.5 bg-gray-400 rounded-full mt-1.5"></div>
+                      <span>No new data was imported to prevent duplicates</span>
+                    </li>
+                  </ul>
+                </div>
+                
+                ${duplicateCount > 0 ? 
+                  `<div class="mt-4">
+                    <button 
+                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.textContent = this.textContent.includes('Show') ? 'Hide Duplicate References' : 'Show Duplicate References'"
+                      class="text-sm text-blue-600 hover:text-blue-800 font-medium mb-2 mx-auto block"
+                    >
+                      Show Duplicate References
+                    </button>
+                    <div class="hidden max-h-40 overflow-y-auto bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      <p class="text-xs text-gray-600 mb-2 text-center">Transaction references already in database:</p>
+                      <div class="space-y-1">
+                        ${duplicateRefs.slice(0, 10).map(ref => `
+                          <div class="flex items-center gap-2 p-2 bg-white rounded border border-gray-200 justify-between">
+                            <div class="w-2 h-2 bg-amber-500 rounded-full"></div>
+                            <code class="text-xs font-mono text-gray-800 flex-1 text-center">${ref}</code>
+                          </div>
+                        `).join('')}
+                      </div>
+                      ${duplicateRefs.length > 10 ? 
+                        `<p class="text-xs text-gray-500 text-center mt-2">Showing 10 of ${duplicateRefs.length} duplicate references</p>` : 
+                        ''}
+                    </div>
+                  </div>` : 
+                  ''}
+              </div>`
+            );
+          } else if (savedTransactions > 0 && duplicateCount > 0) {
+            // Some saved, some duplicates
+            await showWarningAlert(
+              'Import Completed with Warnings',
+              `<div class="text-center max-w-4xl mx-auto">
+                <div class="flex items-start gap-3 mb-4">
+                  <div class="p-2 bg-blue-100 rounded-lg">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 class="font-semibold text-blue-900 text-lg text-center">Partially Imported</h4>
+                    <p class="text-sm text-blue-700 mt-1 text-center">This bank statement contains both new and existing transactions</p>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                  <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p class="text-xs text-emerald-700 text-center">New Transactions</p>
+                    <p class="text-2xl font-bold text-emerald-800 text-center">${savedTransactions}</p>
+                    <p class="text-xs text-emerald-600 text-center">Successfully imported</p>
+                  </div>
+                  <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p class="text-xs text-amber-700 text-center">Duplicate Transactions</p>
+                    <p class="text-2xl font-bold text-amber-800 text-center">${duplicateCount}</p>
+                    <p class="text-xs text-amber-600 text-center">Already in system</p>
+                  </div>
+                </div>
+                
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-sm font-medium text-gray-900 text-center">Summary</span>
+                  </div>
+                  <p class="text-sm text-gray-600 text-center">
+                    ✅ <strong>${savedTransactions} new transaction${savedTransactions !== 1 ? 's' : ''}</strong> were added to the database.<br/>
+                    ⚠️ <strong>${duplicateCount} transaction${duplicateCount !== 1 ? 's' : ''}</strong> were skipped because they already exist.
+                  </p>
+                </div>
+                
+                ${duplicateCount > 0 ? 
+                  `<div class="mt-4">
+                    <button 
+                      onclick="this.nextElementSibling.classList.toggle('hidden'); this.textContent = this.textContent.includes('Show') ? 'Hide Duplicate References' : 'Show Duplicate References'"
+                      class="text-sm text-blue-600 hover:text-blue-800 font-medium mb-2 mx-auto block"
+                    >
+                      Show Duplicate References
+                    </button>
+                    <div class="hidden max-h-40 overflow-y-auto bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      <p class="text-xs text-gray-600 mb-2 text-center">Skipped transaction references:</p>
+                      <div class="space-y-1">
+                        ${duplicateRefs.slice(0, 10).map(ref => `
+                          <div class="flex items-center gap-2 p-2 bg-white rounded border border-gray-200 justify-between">
+                            <div class="w-2 h-2 bg-amber-500 rounded-full"></div>
+                            <code class="text-xs font-mono text-gray-800 flex-1 text-center">${ref}</code>
+                          </div>
+                        `).join('')}
+                      </div>
+                      ${duplicateRefs.length > 10 ? 
+                        `<p class="text-xs text-gray-500 text-center mt-2">Showing 10 of ${duplicateRefs.length} duplicate references</p>` : 
+                        ''}
+                    </div>
+                  </div>` : 
+                  ''}
+              </div>`
+            );
+          } else if (savedTransactions > 0 && duplicateCount === 0) {
+            // All saved, no duplicates
+            showSuccessAlert(
+              'File Imported Successfully!',
+              `<div class="text-center max-w-3xl mx-auto">
+                <div class="flex items-start gap-3 mb-3">
+                  <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <h4 class="font-semibold text-emerald-900 text-center">All Transactions Imported</h4>
+                    <p class="text-sm text-emerald-700 text-center">Successfully imported ${savedTransactions} new transaction${savedTransactions !== 1 ? 's' : ''} from bank statement.</p>
+                  </div>
+                </div>
+                <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-lg mt-2">
+                  <p class="text-sm text-emerald-700 text-center">
+                    ✅ All ${savedTransactions} transaction${savedTransactions !== 1 ? 's' : ''} were unique and have been added to the database.
+                  </p>
+                </div>
+              </div>`
+            );
+          } else {
+            // No transactions at all (empty file?)
+            showWarningAlert(
+              'No Transactions Found',
+              `<div class="text-center max-w-3xl mx-auto">
+                <div class="flex items-start gap-3 mb-3">
+                  <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.782 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <div>
+                    <h4 class="font-semibold text-amber-900 text-center">Empty or Invalid File</h4>
+                    <p class="text-sm text-amber-700 text-center">No valid transactions were found in the uploaded file.</p>
+                  </div>
+                </div>
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p class="text-sm text-amber-700 text-center">
+                    Please check that the file contains valid transaction data in the correct format.
+                  </p>
+                </div>
+              </div>`
+            );
+          }
           
+          // Update transactions list with imported ones
+          if (importedTransactions.length > 0) {
+            const transformedData = transformTransactionResponse(importedTransactions);
+            setBankStatements(prev => [...transformedData, ...prev]);
+          }
+          
+          setCurrentPage(1);
           await fetchStatistics();
           
-          showSuccessAlert(
-            'File Imported!',
-            `Successfully imported ${importedData.length} transactions from bank statement. Statistics have been updated.`
+        } else {
+          // Error response from backend
+          showErrorAlert(
+            'Import Failed',
+            responseData.message || 'Failed to import bank statement file.'
           );
-        } catch (error) {
-          console.error('Import error:', error);
-          showErrorAlert('Import Failed', error.message || 'Failed to import bank statement file.');
-        } finally {
-          setIsLoading(false);
         }
+        
+      } catch (error) {
+        console.error('Import error:', error);
+        
+        // Check for duplicate error
+        if (error.message && (error.message.includes('Duplicate') || error.message.includes('duplicate'))) {
+          await showWarningAlert(
+            'Duplicate Transactions Detected',
+            `<div class="text-center max-w-4xl mx-auto">
+              <div class="flex items-start gap-3 mb-3">
+                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1.5 3 4 3h8c2.5 0 4-1 4-3V7c0-2-1.5-3-4-3H8C5.5 4 4 5 4 7z" />
+                </svg>
+                <div>
+                  <h4 class="font-semibold text-amber-900 text-center">Possible Duplicate Transactions</h4>
+                  <p class="text-sm text-amber-700 text-center">The import may contain transactions that already exist in the database.</p>
+                </div>
+              </div>
+              <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p class="text-sm text-amber-700 text-center">
+                  Only unique transactions will be imported. Duplicates will be automatically skipped.
+                  If all transactions are duplicates, no new data will be added.
+                </p>
+              </div>
+            </div>`
+          );
+        } else {
+          showErrorAlert('Import Failed', error.message || 'Failed to import bank statement file.');
+        }
+      } finally {
+        setIsLoading(false);
       }
-    );
-  };
+    }
+  );
+};
 
-  // Edit Payment Record - using SweetAlert2
+  // Edit Payment Record
   const handleEditPaymentRecord = async (bankTransaction = null, isNewMatch = false) => {
     if (bankTransaction?.student?.id) {
       const validationResult = await validateStudentForPayment(bankTransaction.student.id);
@@ -1786,51 +2307,55 @@ const Transactions = () => {
     }
 
     const { value: formValues } = await MySwal.fire({
-      title: <div className="flex items-center gap-2">
+      title: <div className="flex items-center gap-2 justify-center">
         <Edit className="w-6 h-6 text-gray-900" />
         <span>{isNewMatch ? 'Match Bank Transaction' : 'Edit Payment Record'}</span>
       </div>,
       html: (
-        <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
+        <div className="text-center space-y-6 max-h-[70vh] overflow-y-auto max-w-4xl mx-auto">
           {/* Bank Transaction Details */}
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="flex items-center gap-2">
                   <Banknote className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-bold text-lg text-gray-900">Bank Transaction</h3>
+                  <h3 className="font-bold text-lg text-gray-900 text-center">Bank Transaction</h3>
                 </div>
-                <p className="text-sm text-gray-600">Details from bank statement</p>
+                <p className="text-sm text-gray-600 text-center">Details from bank statement</p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-bold text-emerald-600">
+                <p className="text-lg font-bold text-emerald-600 text-center">
                   KSh {bankTransaction?.amount?.toLocaleString('en-KE') || '0'}
                 </p>
-                <TransactionStatusBadge status={bankTransaction?.status || 'UNVERIFIED'} />
+                <div className="flex justify-center mt-2">
+                  <TransactionStatusBadge status={bankTransaction?.status || 'UNVERIFIED'} />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div>
-                <p className="text-xs text-gray-500">Date</p>
-                <p className="text-sm font-medium">
+                <p className="text-xs text-gray-500 text-center">Date</p>
+                <p className="text-sm font-medium text-center">
                   {bankTransaction?.transactionDate ? new Date(bankTransaction.transactionDate).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Reference</p>
-                <p className="text-sm font-medium font-mono">{bankTransaction?.bankReference || 'N/A'}</p>
+                <p className="text-xs text-gray-500 text-center">Reference</p>
+                <p className="text-sm font-medium font-mono text-center">{bankTransaction?.bankReference || 'N/A'}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-xs text-gray-500">Description</p>
-                <p className="text-sm font-medium">{bankTransaction?.description || 'N/A'}</p>
+                <p className="text-xs text-gray-500 text-center">Description</p>
+                <div className="flex justify-center">
+                  <TransactionWithIssue transaction={bankTransaction} />
+                </div>
               </div>
             </div>
           </div>
 
           {/* Student Selection */}
           <div>
-            <h4 className="font-semibold text-gray-900 mb-3">Select Student</h4>
-            <div className="relative">
+            <h4 className="font-semibold text-gray-900 mb-3 text-center">Select Student</h4>
+            <div className="relative max-w-2xl mx-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <select
                 id="studentSelect"
@@ -1854,28 +2379,28 @@ const Transactions = () => {
 
           {/* Payment Details */}
           <div className="space-y-4">
-            <h4 className="font-semibold text-gray-900">Payment Details</h4>
-            <div className="grid grid-cols-2 gap-4">
+            <h4 className="font-semibold text-gray-900 text-center">Payment Details</h4>
+            <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1 text-center">
                   Amount (KSh)
                 </label>
                 <input
                   type="number"
                   id="paymentAmount"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
                   defaultValue={bankTransaction?.amount || ''}
                   min="0"
                   readOnly={!!bankTransaction}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1 text-center">
                   Payment Method
                 </label>
                 <select
                   id="paymentMethod"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
                   defaultValue={bankTransaction?.paymentMethod || 'BANK_TRANSFER'}
                 >
                   <option value="ONLINE_BANKING">Online Banking</option>
@@ -1892,26 +2417,26 @@ const Transactions = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1 text-center">
                   Payment Date
                 </label>
                 <input
                   type="date"
                   id="paymentDate"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
                   defaultValue={bankTransaction?.transactionDate ? new Date(bankTransaction.transactionDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1 text-center">
                   Notes (Optional)
                 </label>
                 <input
                   type="text"
                   id="paymentNotes"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
                   placeholder="Add any notes about this payment..."
                   defaultValue={bankTransaction?.notes || ''}
                 />
@@ -1920,10 +2445,10 @@ const Transactions = () => {
           </div>
 
           {/* SMS Notification Options */}
-          <div className="space-y-3">
+          <div className="space-y-3 max-w-2xl mx-auto">
             <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-gray-900">SMS Notification</h4>
-              <span className="text-xs text-gray-500">Send confirmation to parent</span>
+              <h4 className="font-semibold text-gray-900 text-center">SMS Notification</h4>
+              <span className="text-xs text-gray-500 text-center">Send confirmation to parent</span>
             </div>
             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
               <label className="flex items-center justify-between cursor-pointer">
@@ -1948,10 +2473,11 @@ const Transactions = () => {
       confirmButtonColor: '#3b82f6',
       cancelButtonColor: '#6b7280',
       showCloseButton: true,
-      width: 700,
+      width: 900,
       customClass: {
         popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold flex items-center gap-2',
+        title: 'text-lg font-bold flex items-center gap-2 justify-center',
+        htmlContainer: 'text-center'
       },
       preConfirm: async () => {
         const studentSelect = document.getElementById('studentSelect');
@@ -1969,8 +2495,8 @@ const Transactions = () => {
         if (!validationResult.success) {
           MySwal.showValidationMessage(
             <div>
-              <p className="text-amber-700 font-medium">Student Validation Failed:</p>
-              <p className="text-sm">{validationResult.message}</p>
+              <p className="text-amber-700 font-medium text-center">Student Validation Failed:</p>
+              <p className="text-sm text-center">{validationResult.message}</p>
             </div>
           );
           return false;
@@ -1997,7 +2523,7 @@ const Transactions = () => {
     }
   };
 
-  // Process payment verification and send SMS
+  // Process payment verification
   const processPaymentVerification = async (formValues, bankTransaction) => {
     setIsLoading(true);
     try {
@@ -2118,20 +2644,21 @@ const Transactions = () => {
     }
   };
 
-  // Handle view transaction details - using SweetAlert2
+  // Handle view transaction details
   const handleViewTransactionDetails = (transaction) => {
     const student = transaction.student;
     const isMatched = transaction.status === 'MATCHED';
     const isVerified = transaction.status === 'VERIFIED';
     const smsSent = transaction.smsSent || false;
+    const issueInfo = extractIssueInfo(transaction);
 
     showModalWithLockedBackground({
-      title: <div className="flex items-center gap-2">
+      title: <div className="flex items-center gap-2 justify-center">
         <Eye className="w-6 h-6 text-gray-900" />
         <span>Transaction Details</span>
       </div>,
       html: (
-        <div className="text-left space-y-6">
+        <div className="text-center space-y-6 max-w-4xl mx-auto">
           {/* Transaction Type */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -2142,10 +2669,8 @@ const Transactions = () => {
             </div>
             <div className="flex items-center gap-2">
               <TransactionStatusBadge status={transaction.status || 'UNVERIFIED'} />
-              {isMatched && (
-                <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">
-                  System Auto-Verified
-                </span>
+              {issueInfo.hasIssue && (
+                <IssueTypeBadge issueType={issueInfo.issueType} />
               )}
             </div>
           </div>
@@ -2153,32 +2678,50 @@ const Transactions = () => {
           {/* Transaction Details */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-gray-500">Reference Number</p>
-              <p className="text-sm font-mono font-medium">{transaction.bankReference || 'N/A'}</p>
+              <p className="text-xs text-gray-500 text-center">Reference Number</p>
+              <p className="text-sm font-mono font-medium text-center">{transaction.bankReference || 'N/A'}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Date</p>
-              <p className="text-sm font-medium">
+              <p className="text-xs text-gray-500 text-center">Date</p>
+              <p className="text-sm font-medium text-center">
                 {transaction.transactionDate ? new Date(transaction.transactionDate).toLocaleDateString() : 'N/A'}
               </p>
             </div>
             <div className="col-span-2">
-              <p className="text-xs text-gray-500">Description</p>
-              <p className="text-sm font-medium">{transaction.description || 'N/A'}</p>
+              <p className="text-xs text-gray-500 text-center">Description</p>
+              <div className="flex justify-center">
+                <TransactionWithIssue transaction={transaction} />
+              </div>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Amount</p>
-              <p className="text-xl font-bold text-gray-900">KSh {transaction.amount?.toLocaleString('en-KE') || '0'}</p>
+              <p className="text-xs text-gray-500 text-center">Amount</p>
+              <p className="text-xl font-bold text-gray-900 text-center">KSh {transaction.amount?.toLocaleString('en-KE') || '0'}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-500">Payment Method</p>
-              <div className="mt-1">
+              <p className="text-xs text-gray-500 text-center">Payment Method</p>
+              <div className="mt-1 flex justify-center">
                 <PaymentMethodBadge
                   method={transaction.paymentMethod || getPaymentMethodFromBankTransaction(transaction.description)}
                 />
               </div>
             </div>
           </div>
+
+          {/* Duplicate Warning */}
+          {issueInfo.issueType === 'DUPLICATE' && (
+            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <DatabaseIcon className="w-5 h-5 text-gray-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-gray-800 mb-2 text-center">⚠️ Duplicate Transaction</h4>
+                  <p className="text-sm text-gray-700 text-center">
+                    This transaction was skipped during import because it already exists in the database.
+                    Each transaction reference must be unique.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* SMS Status */}
           <div className="p-3 bg-gray-50 rounded-lg">
@@ -2196,11 +2739,48 @@ const Transactions = () => {
               </div>
             </div>
             {smsSent && transaction.smsSentAt && (
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-gray-500 mt-2 text-center">
                 Sent on: {new Date(transaction.smsSentAt).toLocaleString()}
               </p>
             )}
           </div>
+
+          {/* Show Issue Resolution section */}
+          {issueInfo.hasIssue && transaction.status === 'UNVERIFIED' && issueInfo.issueType !== 'DUPLICATE' && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-amber-800 mb-2 text-center">This transaction has validation issues</h4>
+                  <p className="text-sm text-amber-700 mb-3 text-center">
+                    To resolve this issue:
+                  </p>
+                  <ul className="text-sm text-amber-700 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                      <span>Edit the transaction manually to correct the information</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <User className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                      <span>Match it to the correct student manually</span>
+                    </li>
+                    {issueInfo.issueType === 'INVALID' && (
+                      <li className="flex items-start gap-2">
+                        <FileX className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
+                        <span>Fix the invalid data (e.g., correct date format, add missing fields)</span>
+                      </li>
+                    )}
+                    {issueInfo.issueType === 'FORMAT' && (
+                      <li className="flex items-start gap-2">
+                        <Calendar className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                        <span>Fix the format issue (e.g., correct date/amount format)</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Student Information */}
           {student && (
@@ -2208,7 +2788,7 @@ const Transactions = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-blue-600" />
-                  <h4 className="font-semibold text-gray-900">Student Information</h4>
+                  <h4 className="font-semibold text-gray-900 text-center">Student Information</h4>
                 </div>
                 <button
                   type="button"
@@ -2223,16 +2803,16 @@ const Transactions = () => {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-gray-500">Student Name</p>
-                  <p className="text-sm font-medium">{student.fullName}</p>
+                  <p className="text-xs text-gray-500 text-center">Student Name</p>
+                  <p className="text-sm font-medium text-center">{student.fullName}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Class</p>
-                  <p className="text-sm font-medium">{student.grade}</p>
+                  <p className="text-xs text-gray-500 text-center">Class</p>
+                  <p className="text-sm font-medium text-center">{student.grade}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Term Status</p>
-                  <p className="text-sm font-medium flex items-center gap-2">
+                  <p className="text-xs text-gray-500 text-center">Term Status</p>
+                  <p className="text-sm font-medium flex items-center gap-2 justify-center">
                     {student.hasTermAssignments ? (
                       <>
                         <CheckCircle className="w-4 h-4 text-emerald-500" />
@@ -2247,25 +2827,26 @@ const Transactions = () => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Total Terms</p>
-                  <p className="text-sm font-medium">{student.termAssignmentCount || 0}</p>
+                  <p className="text-xs text-gray-500 text-center">Total Terms</p>
+                  <p className="text-sm font-medium text-center">{student.termAssignmentCount || 0}</p>
                 </div>
               </div>
             </div>
           )}
         </div>
       ),
-      width: 600,
+      width: 900,
       showConfirmButton: false,
       showCloseButton: true,
       customClass: {
         popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold flex items-center gap-2'
+        title: 'text-lg font-bold flex items-center gap-2 justify-center',
+        htmlContainer: 'text-center'
       }
     });
   };
 
-  // Handle bulk verification with student validation
+  // Handle bulk verification
   const handleBulkVerify = async () => {
     const selectedBankTransactions = bankStatements.filter(stmt =>
       selectedTransactions.includes(stmt.id) &&
@@ -2277,76 +2858,70 @@ const Transactions = () => {
       return;
     }
 
-    const uniqueStudentIds = [...new Set(selectedBankTransactions
-      .filter(t => t.student?.id)
-      .map(t => t.student.id))];
-    
-    if (uniqueStudentIds.length > 0) {
-      const validationResults = [];
-      for (const studentId of uniqueStudentIds) {
-        const result = await validateStudentForPayment(studentId);
-        validationResults.push({ studentId, result });
-      }
+    // Check if any selected transactions have validation issues
+    const transactionsWithIssues = selectedBankTransactions.filter(t => {
+      const issueInfo = extractIssueInfo(t);
+      return issueInfo.hasIssue && issueInfo.issueType !== 'DUPLICATE';
+    });
 
-      const invalidStudents = validationResults.filter(r => !r.result.success);
-      if (invalidStudents.length > 0) {
-        const result = await showWarningAlert(
-          'Student Validation Required',
-          `${invalidStudents.length} student(s) have term assignment issues that need to be resolved before bulk verification.`,
-          {
-            text: 'View Issues',
-            color: '#f59e0b'
-          }
-        );
-
-        if (result.isConfirmed) {
-          const issuesHtml = (
-            <div className="text-left space-y-3">
-              <h4 className="font-semibold text-amber-800">Validation Issues:</h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {invalidStudents.map((item, index) => {
-                  const student = getStudentData(item.studentId);
-                  return (
-                    <div key={index} className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                      <p className="font-medium text-gray-900">{student?.fullName || `Student ${item.studentId}`}</p>
-                      <p className="text-sm text-amber-700 mt-1">{item.result.message}</p>
-                      {student && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            MySwal.close();
-                            await handleViewTermAssignments(student);
-                          }}
-                          className="mt-2 px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
-                        >
-                          View Term Assignments
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-
-          await MySwal.fire({
-            title: <div className="flex items-center gap-2">
-              <AlertTriangle className="w-6 h-6 text-amber-600" />
-              <span>Resolve These Issues</span>
-            </div>,
-            html: issuesHtml,
-            showConfirmButton: true,
-            confirmButtonText: 'Understood',
-            confirmButtonColor: '#3b82f6',
-            width: 600,
-            customClass: {
-              popup: 'rounded-2xl border border-gray-200 shadow-xl',
-              title: 'text-lg font-bold flex items-center gap-2',
-            }
-          });
-          
-          return;
+    if (transactionsWithIssues.length > 0) {
+      const result = await showWarningAlert(
+        'Transactions with Issues',
+        `${transactionsWithIssues.length} of the selected transactions have validation issues. These should be fixed before verification.`,
+        {
+          text: 'View Issues',
+          color: '#f59e0b'
         }
+      );
+
+      if (result.isConfirmed) {
+        const issuesHtml = `
+          <div class="text-center space-y-3 max-w-4xl mx-auto">
+            <h4 class="font-semibold text-amber-800 mb-2 text-center">Transactions with Issues:</h4>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+              ${transactionsWithIssues.slice(0, 10).map((transaction, index) => {
+                const issueInfo = extractIssueInfo(transaction);
+                return `
+                  <div key="${index}" class="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <p class="font-medium text-gray-900 text-center">
+                      ${transaction.bankReference} - KSh ${transaction.amount?.toLocaleString('en-KE')}
+                    </p>
+                    <p class="text-sm text-amber-700 mt-1 text-center">
+                      ${issueInfo.issueMessage}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1 text-center">
+                      ${issueInfo.originalDescription}
+                    </p>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            ${transactionsWithIssues.length > 10 ? `
+              <p class="text-sm text-gray-500 text-center">
+                Showing 10 of ${transactionsWithIssues.length} transactions with issues
+              </p>
+            ` : ''}
+          </div>
+        `;
+
+        await MySwal.fire({
+          title: <div className="flex items-center gap-2 justify-center">
+            <AlertTriangle className="w-6 h-6 text-amber-600" />
+            <span>Fix Issues Before Verification</span>
+          </div>,
+          html: issuesHtml,
+          showConfirmButton: true,
+          confirmButtonText: 'Understood',
+          confirmButtonColor: '#3b82f6',
+          width: 800,
+          customClass: {
+            popup: 'rounded-2xl border border-gray-200 shadow-xl',
+            title: 'text-lg font-bold flex items-center gap-2 justify-center',
+            htmlContainer: 'text-center'
+          }
+        });
+        
+        return;
       }
     }
 
@@ -2456,7 +3031,7 @@ const Transactions = () => {
     }
   };
 
-  // Format amount for display using Kenyan Shillings
+  // Format amount
   const formatAmount = (amount) => {
     if (!amount && amount !== 0) return 'KSh 0';
     
@@ -2479,6 +3054,24 @@ const Transactions = () => {
     matchRate: backendStats.matchRate || "0%",
     totalPendingAmount: formatAmount(backendStats.totalPendingFees)
   }), [backendStats]);
+
+  // Calculate issue statistics for unmatched tab
+  const issueStatistics = useMemo(() => {
+    const unmatchedTransactions = bankStatements.filter(stmt => 
+      stmt.status === 'UNVERIFIED' || stmt.status === 'PENDING'
+    );
+    
+    return unmatchedTransactions.reduce((stats, transaction) => {
+      const issueInfo = extractIssueInfo(transaction);
+      if (issueInfo.hasIssue) {
+        stats.total++;
+        stats.byType[issueInfo.issueType] = (stats.byType[issueInfo.issueType] || 0) + 1;
+      } else {
+        stats.noIssue++;
+      }
+      return stats;
+    }, { total: 0, noIssue: 0, byType: {} });
+  }, [bankStatements]);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-blue-50/30 p-4 md:p-6">
@@ -2615,8 +3208,8 @@ const Transactions = () => {
                   <ClipboardCheck className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-blue-900">Bulk Student Validation</h3>
-                  <p className="text-sm text-blue-700">
+                  <h3 className="font-semibold text-blue-900 text-center">Bulk Student Validation</h3>
+                  <p className="text-sm text-blue-700 text-center">
                     {selectedStudents.length} student{selectedStudents.length > 1 ? 's' : ''} selected for validation
                   </p>
                 </div>
@@ -2642,6 +3235,57 @@ const Transactions = () => {
         </motion.div>
       )}
 
+      {/* Issue Statistics for Unmatched Tab */}
+      {activeTab === 'unverified' && issueStatistics.total > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div className="p-4 bg-linear-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-amber-900 text-center">Transactions with Issues</h3>
+                  <p className="text-sm text-amber-700 text-center">
+                    {issueStatistics.total} transaction{issueStatistics.total !== 1 ? 's' : ''} have validation issues that need attention
+                  </p>
+                </div>
+              </div>
+              <div className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg text-sm font-medium">
+                Imported with Issues
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-5 gap-3">
+              <div className="p-3 bg-white rounded-lg border border-amber-100">
+                <p className="text-xs text-gray-500 text-center">Total Issues</p>
+                <p className="text-xl font-bold text-amber-800 text-center">{issueStatistics.total}</p>
+              </div>
+              {Object.entries(issueStatistics.byType).map(([type, count]) => (
+                <div key={type} className={`p-3 bg-white rounded-lg border ${
+                  type === 'DUPLICATE' ? 'border-gray-100 text-gray-800' :
+                  type === 'INVALID' ? 'border-rose-100 text-rose-800' :
+                  type === 'FORMAT' ? 'border-purple-100 text-purple-800' :
+                  'border-amber-100 text-amber-800'
+                }`}>
+                  <p className="text-xs text-gray-500 text-center">
+                    {type === 'DUPLICATE' ? 'Duplicate' :
+                     type === 'INVALID' ? 'Invalid' :
+                     type === 'FORMAT' ? 'Format' :
+                     'Unmatched'}
+                  </p>
+                  <p className="text-xl font-bold text-center">{count}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Tabs */}
       <div className="mb-6">
         <div className="flex border-b border-gray-200">
@@ -2662,13 +3306,79 @@ const Transactions = () => {
             >
               <tab.icon className="w-4 h-4" />
               {tab.label}
-              {isTableLoading && activeTab === tab.id && (
-                <Loader2 className="w-3 h-3 ml-2 animate-spin text-blue-500" />
+              {activeTab === 'unverified' && tab.id === 'unverified' && issueStatistics.total > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-xs rounded-full flex items-center justify-center">
+                  {issueStatistics.total}
+                </span>
               )}
             </button>
           ))}
         </div>
       </div>
+
+      {/* Issue Filter for Unmatched Tab */}
+      {activeTab === 'unverified' && issueStatistics.total > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700 text-center">Filter by Issue Type:</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setIssueFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  issueFilter === 'ALL'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                All Issues ({issueStatistics.total})
+              </button>
+              {Object.entries(issueStatistics.byType).map(([type, count]) => (
+                <button
+                  key={type}
+                  onClick={() => setIssueFilter(type)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                    issueFilter === type
+                      ? type === 'DUPLICATE' ? 'bg-gray-600 text-white' :
+                        type === 'INVALID' ? 'bg-rose-600 text-white' :
+                        type === 'FORMAT' ? 'bg-purple-600 text-white' :
+                        'bg-amber-600 text-white'
+                      : type === 'DUPLICATE' ? 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100' :
+                        type === 'INVALID' ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100' :
+                        type === 'FORMAT' ? 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100' :
+                        'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  {type === 'DUPLICATE' && <DatabaseIcon className="w-3 h-3" />}
+                  {type === 'INVALID' && <FileX className="w-3 h-3" />}
+                  {type === 'FORMAT' && <Calendar className="w-3 h-3" />}
+                  {type === 'UNMATCHED' && <User className="w-3 h-3" />}
+                  {type === 'DUPLICATE' ? 'Duplicate' :
+                   type === 'INVALID' ? 'Invalid' :
+                   type === 'FORMAT' ? 'Format' :
+                   'Unmatched'} ({count})
+                </button>
+              ))}
+              <button
+                onClick={() => setIssueFilter('NO_ISSUE')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  issueFilter === 'NO_ISSUE'
+                    ? 'bg-gray-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                No Issues ({issueStatistics.noIssue || 0})
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Main Content - Fullscreen Table Container */}
       <motion.div
@@ -2691,6 +3401,14 @@ const Transactions = () => {
                  activeTab === 'matched' ? 'Transactions automatically matched by the system algorithm' :
                  activeTab === 'verified' ? 'Manually verified payments with student records' :
                  'Complete transaction history'}
+                {activeTab === 'unverified' && issueFilter !== 'ALL' && (
+                  <span className="ml-2 font-medium">
+                    • Showing {issueFilter === 'INVALID' ? 'Invalid' :
+                              issueFilter === 'UNMATCHED' ? 'Unmatched' :
+                              issueFilter === 'FORMAT' ? 'Format' :
+                              'No Issue'} transactions
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
@@ -2773,6 +3491,7 @@ const Transactions = () => {
               <table className="w-full min-w-300">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
+                    {/* Conditional Checkbox Column - Column 0 */}
                     {activeTab === 'unverified' && (
                       <th className="px-6 py-4 text-left">
                         <div className="flex items-center gap-3">
@@ -2790,18 +3509,23 @@ const Transactions = () => {
                         </div>
                       </th>
                     )}
+                    {/* Transaction Details - Column 1/2 */}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-62.5">
                       Transaction Details
                     </th>
+                    {/* Amount & Method - Column 2/3 */}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-45">
                       Amount & Method
                     </th>
+                    {/* Status - Column 3/4 */}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-40">
                       Status
                     </th>
+                    {/* Issue Details / Student Match - Column 4/5 */}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-55">
-                      Student Match
+                      {activeTab === 'unverified' ? 'Issue Details' : 'Student Match'}
                     </th>
+                    {/* Actions - Column 5/6 */}
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-75">
                       Actions
                     </th>
@@ -2814,6 +3538,7 @@ const Transactions = () => {
                     const isVerified = transaction.status === 'VERIFIED';
                     const student = transaction.student;
                     const smsSent = transaction.smsSent || false;
+                    const issueInfo = extractIssueInfo(transaction);
 
                     return (
                       <motion.tr
@@ -2822,6 +3547,7 @@ const Transactions = () => {
                         animate={{ opacity: 1, y: 0 }}
                         className="hover:bg-gray-50 transition-colors"
                       >
+                        {/* Conditional Checkbox Column - Column 0 */}
                         {activeTab === 'unverified' && (
                           <td className="px-6 py-4">
                             <input
@@ -2833,68 +3559,43 @@ const Transactions = () => {
                             />
                           </td>
                         )}
+                        
+                        {/* Transaction Details Column - Column 1/2 */}
                         <td className="px-6 py-4">
                           <div className="space-y-2">
                             <div className="flex items-start gap-3">
                               <Banknote className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-900 truncate">
-                                  {transaction.description || 'Bank Transaction'}
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {issueInfo.originalDescription || 'No description'}
                                 </p>
-                                <div className="mt-2 space-y-1">
-                                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                                    <Calendar className="w-3 h-3" />
-                                    <span>
-                                      {transaction.transactionDate 
-                                        ? new Date(transaction.transactionDate).toLocaleDateString('en-KE', {
-                                            day: '2-digit',
-                                            month: 'short',
-                                            year: 'numeric'
-                                          })
-                                        : 'Date N/A'
-                                      }
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs">
-                                    <FileText className="w-3 h-3 text-gray-500" />
-                                    <code className="text-xs font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded truncate max-w-50">
-                                      {transaction.bankReference || 'No Ref'}
-                                    </code>
-                                  </div>
-                                  {student && (
-                                    <div className="flex items-center gap-2 text-xs">
-                                      <div className={`p-1 rounded ${
-                                        student.hasTermAssignments 
-                                          ? 'bg-emerald-100 text-emerald-700' 
-                                          : 'bg-amber-100 text-amber-700'
-                                      }`}>
-                                        <User className="w-3 h-3" />
-                                      </div>
-                                      <span className="font-medium truncate">{student.fullName}</span>
-                                      {student.grade && <span className="text-gray-500">({student.grade})</span>}
-                                      <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
-                                        student.hasTermAssignments
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                      }`}>
-                                        {student.hasTermAssignments ? (
-                                          <CheckCircle className="w-3 h-3" />
-                                        ) : (
-                                          <AlertTriangle className="w-3 h-3" />
-                                        )}
-                                        <span>
-                                          {student.hasTermAssignments 
-                                            ? `${student.termAssignmentCount || 0} term(s)` 
-                                            : 'No terms'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-2 space-y-1">
+                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                                <Calendar className="w-3 h-3" />
+                                <span>
+                                  {transaction.transactionDate 
+                                    ? new Date(transaction.transactionDate).toLocaleDateString('en-KE', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric'
+                                      })
+                                    : 'Date N/A'
+                                  }
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <FileText className="w-3 h-3 text-gray-500" />
+                                <code className="text-xs font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded truncate max-w-50">
+                                  {transaction.bankReference || 'No Ref'}
+                                </code>
                               </div>
                             </div>
                           </div>
                         </td>
+                        
+                        {/* Amount & Method Column - Column 2/3 */}
                         <td className="px-6 py-4">
                           <div className="space-y-2">
                             <p className="text-lg font-bold text-gray-900">KSh {transaction.amount?.toLocaleString('en-KE') || '0'}</p>
@@ -2911,6 +3612,8 @@ const Transactions = () => {
                             )}
                           </div>
                         </td>
+                        
+                        {/* Status Column - Column 3/4 */}
                         <td className="px-6 py-4">
                           <div className="space-y-2">
                             <TransactionStatusBadge
@@ -2926,10 +3629,70 @@ const Transactions = () => {
                                 Auto-matched: {new Date(transaction.matchedAt).toLocaleDateString()}
                               </p>
                             )}
+                            {issueInfo.hasIssue && (
+                              <div className="mt-2">
+                                <IssueTypeBadge issueType={issueInfo.issueType} />
+                              </div>
+                            )}
                           </div>
                         </td>
+                        
+                        {/* Issue Details / Student Match Column - Column 4/5 */}
                         <td className="px-6 py-4">
-                          {student ? (
+                          {activeTab === 'unverified' && issueInfo.hasIssue ? (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-gray-900">
+                                  {issueInfo.issueType === 'INVALID' ? 'Invalid Transaction' :
+                                   issueInfo.issueType === 'FORMAT' ? 'Format Issue' :
+                                   'Unmatched Transaction'}
+                                </p>
+                                {issueInfo.issueType === 'INVALID' && (
+                                  <span className="text-xs font-medium text-rose-700">⚠️ Requires Fixing</span>
+                                )}
+                              </div>
+                              
+                              {/* Show the full issue description */}
+                              <div className={`p-3 rounded-lg border ${
+                                issueInfo.issueType === 'INVALID' ? 'bg-rose-50 border-rose-200' :
+                                issueInfo.issueType === 'FORMAT' ? 'bg-purple-50 border-purple-200' :
+                                'bg-amber-50 border-amber-200'
+                              }`}>
+                                <div className="flex items-start gap-3">
+                                  <div className={`p-1.5 rounded-md bg-white border ${
+                                    issueInfo.issueType === 'INVALID' ? 'border-rose-200' :
+                                    issueInfo.issueType === 'FORMAT' ? 'border-purple-200' :
+                                    'border-amber-200'
+                                  }`}>
+                                    {issueInfo.issueType === 'INVALID' ? (
+                                      <FileX className="w-4 h-4 text-rose-600" />
+                                    ) : issueInfo.issueType === 'FORMAT' ? (
+                                      <Calendar className="w-4 h-4 text-purple-600" />
+                                    ) : (
+                                      <User className="w-4 h-4 text-amber-600" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 mb-1">{issueInfo.issueMessage}</p>
+                                    {transaction.notes && (
+                                      <p className="text-xs text-gray-600 mt-1">{transaction.notes}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {issueInfo.issueType === 'INVALID' && (
+                                <div className="mt-2 p-2 bg-rose-50 rounded border border-rose-200">
+                                  <p className="text-xs text-rose-700 font-medium">
+                                    Fix required before matching
+                                  </p>
+                                  <p className="text-xs text-rose-600 mt-1">
+                                    Edit transaction to fix the issue
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ) : student ? (
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <p className="font-medium text-gray-900 truncate">{student.fullName}</p>
@@ -2956,6 +3719,8 @@ const Transactions = () => {
                             </div>
                           )}
                         </td>
+                        
+                        {/* Actions Column - Column 5/6 */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             {/* Case 1: Unverified transactions */}
@@ -2965,8 +3730,17 @@ const Transactions = () => {
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
                                   onClick={() => handleEditPaymentRecord(transaction, true)}
-                                  className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                  title="Verify Payment"
+                                  className={`p-2 rounded-lg transition-colors ${
+                                    issueInfo.hasIssue && issueInfo.issueType === 'INVALID'
+                                      ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-not-allowed opacity-50'
+                                      : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                  }`}
+                                  title={
+                                    issueInfo.hasIssue && issueInfo.issueType === 'INVALID'
+                                      ? 'Fix issue before matching'
+                                      : 'Verify Payment'
+                                  }
+                                  disabled={issueInfo.hasIssue && issueInfo.issueType === 'INVALID'}
                                 >
                                   <Check className="w-4 h-4" />
                                 </motion.button>
@@ -3045,19 +3819,41 @@ const Transactions = () => {
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center py-12">
                     <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                      <Search className="w-8 h-8 text-gray-400" />
+                      {activeTab === 'unverified' && issueFilter !== 'ALL' ? (
+                        <Filter className="w-8 h-8 text-gray-400" />
+                      ) : (
+                        <Search className="w-8 h-8 text-gray-400" />
+                      )}
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No transactions found</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {activeTab === 'unverified' && issueFilter !== 'ALL'
+                        ? `No ${issueFilter === 'INVALID' ? 'Invalid' : 
+                            issueFilter === 'UNMATCHED' ? 'Unmatched' : 
+                            issueFilter === 'FORMAT' ? 'Format' : 
+                            'No Issue'} transactions found`
+                        : 'No transactions found'}
+                    </h3>
                     <p className="text-gray-500 max-w-md mx-auto mb-6">
                       {activeTab === 'unverified'
-                        ? 'All bank transactions have been processed. Import new bank statements to see more.'
+                        ? issueFilter !== 'ALL'
+                          ? `No ${issueFilter.toLowerCase()} transactions match your current filters. Try changing the issue filter or search query.`
+                          : 'All bank transactions have been processed. Import new bank statements to see more.'
                         : activeTab === 'matched'
                         ? 'No auto-matched transactions found. The system will auto-match transactions during import.'
                         : activeTab === 'verified'
                         ? 'No verified payments found. Verify some unmatched transactions to see them here.'
                         : 'No transactions match your current search criteria.'}
                     </p>
-                    {activeTab === 'unverified' && (
+                    {activeTab === 'unverified' && issueFilter !== 'ALL' && (
+                      <button
+                        onClick={() => setIssueFilter('ALL')}
+                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+                      >
+                        <Filter className="w-4 h-4" />
+                        Show All Transactions
+                      </button>
+                    )}
+                    {activeTab === 'unverified' && issueFilter === 'ALL' && (
                       <button
                         onClick={handleImportFile}
                         className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg"
