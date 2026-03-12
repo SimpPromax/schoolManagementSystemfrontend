@@ -3,7 +3,7 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 
 // Get API URL from environment variable with fallback
-const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.100.126:8080/api';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://102.68.87.156:8080/api';
 
 console.log('🔧 Axios configured with API URL:', API_URL);
 console.log('Environment:', import.meta.env.MODE);

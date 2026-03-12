@@ -112,6 +112,18 @@ import withReactContent from 'sweetalert2-react-content';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 
+
+
+// Add this right after your imports
+console.log('🔥 Environment Check:');
+console.log('MODE:', import.meta.env.MODE);
+console.log('PROD:', import.meta.env.PROD);
+console.log('DEV:', import.meta.env.DEV);
+console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+console.log('All env vars:', import.meta.env);
+
+
+
 const MySwal = withReactContent(Swal);
 
 // SweetAlert2 configuration

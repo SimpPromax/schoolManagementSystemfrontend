@@ -83,6 +83,19 @@ import withReactContent from 'sweetalert2-react-content';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 
+
+
+// Add this right after your imports
+console.log('🔥 Environment Check:');
+console.log('MODE:', import.meta.env.MODE);
+console.log('PROD:', import.meta.env.PROD);
+console.log('DEV:', import.meta.env.DEV);
+console.log('VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+console.log('All env vars:', import.meta.env);
+
+
+
+
 const MySwal = withReactContent(Swal);
 
 // ============================================
@@ -323,7 +336,7 @@ const FeeStatusBadge = ({ status }) => {
     PAID: { label: 'Paid', color: 'bg-emerald-100 text-emerald-800 border-emerald-200', icon: CheckCircle },
     PENDING: { label: 'Pending', color: 'bg-amber-100 text-amber-800 border-amber-200', icon: Clock },
     OVERDUE: { label: 'Overdue', color: 'bg-rose-100 text-rose-800 border-rose-200', icon: AlertTriangle },
-    partial: { label: 'Partial', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Percent }
+    PARTIAL: { label: 'Partial', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Percent }
   };
 
   const { label, color, icon: Icon } = config[status] || config.PENDING;
@@ -508,45 +521,51 @@ const FeeCollection = () => {
   const [recentPaymentsLoading, setRecentPaymentsLoading] = useState(true);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [classAnalyticsLoading, setClassAnalyticsLoading] = useState(true);
+  
+  // Error states for each API
+  const [statsError, setStatsError] = useState(null);
+  const [trendError, setTrendError] = useState(null);
+  const [paymentMethodsError, setPaymentMethodsError] = useState(null);
+  const [overdueError, setOverdueError] = useState(null);
+  const [recentPaymentsError, setRecentPaymentsError] = useState(null);
+  const [studentsError, setStudentsError] = useState(null);
+  const [classAnalyticsError, setClassAnalyticsError] = useState(null);
 
   // Cache for student recent payments
   const [studentRecentPaymentsCache, setStudentRecentPaymentsCache] = useState({});
   const [loadingStudentPayments, setLoadingStudentPayments] = useState({});
 
-  // Load initial data
+  // Load initial data - each API independently
   useEffect(() => {
-    loadInitialData();
+    loadDashboardStats();
+    loadCollectionTrend('MONTHLY');
+    loadPaymentMethods();
+    loadOverdueDistribution();
+    loadRecentPayments(5);
+    loadStudents();
   }, []);
 
-  const loadInitialData = async () => {
-    setIsLoading(true);
-    try {
-      await Promise.all([
-        loadDashboardStats(),
-        loadCollectionTrend('MONTHLY'),
-        loadPaymentMethods(),
-        loadOverdueDistribution(),
-        loadRecentPayments(5),
-        loadStudents(),
-        loadClassAnalytics()
-      ]);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      showErrorAlert('Data Load Failed', 'Failed to load fee collection data. Please try again.');
-    } finally {
-      setIsLoading(false);
+  // Load class analytics when students are loaded
+  useEffect(() => {
+    if (students.length > 0) {
+      calculateClassAnalytics();
+    } else {
+      setClassAnalytics([]);
+      setClassAnalyticsLoading(false);
     }
-  };
+  }, [students]);
 
   const loadDashboardStats = async () => {
     setStatsLoading(true);
+    setStatsError(null);
     try {
       const response = await feeApi.get('/dashboard/stats');
       const statsData = handleResponse(response);
       setDashboardStats(statsData);
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
-      handleError(error);
+      setStatsError(error.message || 'Failed to load dashboard statistics');
+      setDashboardStats(null);
     } finally {
       setStatsLoading(false);
     }
@@ -554,13 +573,15 @@ const FeeCollection = () => {
 
   const loadCollectionTrend = async (period) => {
     setTrendLoading(true);
+    setTrendError(null);
     try {
       const response = await feeApi.get(`/dashboard/trend?period=${period}`);
       const trendData = handleResponse(response);
       setCollectionTrend(trendData.dataPoints || []);
     } catch (error) {
       console.error('Error loading collection trend:', error);
-      handleError(error);
+      setTrendError(error.message || 'Failed to load collection trend');
+      setCollectionTrend([]);
     } finally {
       setTrendLoading(false);
     }
@@ -568,13 +589,15 @@ const FeeCollection = () => {
 
   const loadPaymentMethods = async () => {
     setPaymentMethodsLoading(true);
+    setPaymentMethodsError(null);
     try {
       const response = await feeApi.get('/dashboard/payment-methods');
       const paymentData = handleResponse(response);
       setPaymentMethods(paymentData.paymentMethods || []);
     } catch (error) {
       console.error('Error loading payment methods:', error);
-      handleError(error);
+      setPaymentMethodsError(error.message || 'Failed to load payment methods');
+      setPaymentMethods([]);
     } finally {
       setPaymentMethodsLoading(false);
     }
@@ -582,13 +605,15 @@ const FeeCollection = () => {
 
   const loadOverdueDistribution = async () => {
     setOverdueLoading(true);
+    setOverdueError(null);
     try {
       const response = await feeApi.get('/dashboard/overdue-distribution');
       const overdueData = handleResponse(response);
       setOverdueDistribution(overdueData.overdueRanges || []);
     } catch (error) {
       console.error('Error loading overdue distribution:', error);
-      handleError(error);
+      setOverdueError(error.message || 'Failed to load overdue distribution');
+      setOverdueDistribution([]);
     } finally {
       setOverdueLoading(false);
     }
@@ -596,13 +621,15 @@ const FeeCollection = () => {
 
   const loadRecentPayments = async (limit) => {
     setRecentPaymentsLoading(true);
+    setRecentPaymentsError(null);
     try {
       const response = await feeApi.get(`/dashboard/recent-payments?limit=${limit}`);
       const paymentsData = handleResponse(response);
       setRecentPayments(paymentsData || []);
     } catch (error) {
       console.error('Error loading recent payments:', error);
-      handleError(error);
+      setRecentPaymentsError(error.message || 'Failed to load recent payments');
+      setRecentPayments([]);
     } finally {
       setRecentPaymentsLoading(false);
     }
@@ -610,6 +637,7 @@ const FeeCollection = () => {
 
   const loadStudents = async () => {
     setStudentsLoading(true);
+    setStudentsError(null);
     try {
       const filterRequest = {
         page: 0,
@@ -622,16 +650,18 @@ const FeeCollection = () => {
       setStudents(studentsData || []);
     } catch (error) {
       console.error('Error loading students:', error);
-      handleError(error);
+      setStudentsError(error.message || 'Failed to load students');
+      setStudents([]);
     } finally {
       setStudentsLoading(false);
     }
   };
 
-  const loadClassAnalytics = async () => {
+  const calculateClassAnalytics = () => {
     setClassAnalyticsLoading(true);
+    setClassAnalyticsError(null);
     try {
-      // Since the backend endpoint returns empty, we'll calculate from student data
+      // Calculate from student data
       const gradeGroups = {};
       students.forEach(student => {
         if (student.grade) {
@@ -641,25 +671,39 @@ const FeeCollection = () => {
               totalFee: 0,
               collected: 0,
               pending: 0,
-              studentCount: 0
+              studentCount: 0,
+              paidCount: 0,
+              pendingCount: 0,
+              overdueCount: 0
             };
           }
           gradeGroups[student.grade].totalFee += student.totalFee || 0;
           gradeGroups[student.grade].collected += student.paidAmount || 0;
           gradeGroups[student.grade].pending += student.pendingAmount || 0;
           gradeGroups[student.grade].studentCount += 1;
+          
+          // Count by status
+          if (student.feeStatus === 'PAID') {
+            gradeGroups[student.grade].paidCount += 1;
+          } else if (student.feeStatus === 'OVERDUE') {
+            gradeGroups[student.grade].overdueCount += 1;
+          } else {
+            gradeGroups[student.grade].pendingCount += 1;
+          }
         }
       });
       
       setClassAnalytics(Object.values(gradeGroups));
     } catch (error) {
-      console.error('Error loading class analytics:', error);
+      console.error('Error calculating class analytics:', error);
+      setClassAnalyticsError('Failed to calculate class analytics');
+      setClassAnalytics([]);
     } finally {
       setClassAnalyticsLoading(false);
     }
   };
 
-  // NEW: Load recent payments for a specific student
+  // Load recent payments for a specific student
   const loadStudentRecentPayments = async (studentId, limit = 5) => {
     setLoadingStudentPayments(prev => ({ ...prev, [studentId]: true }));
     
@@ -671,15 +715,14 @@ const FeeCollection = () => {
       setStudentRecentPaymentsCache(prev => ({
         ...prev,
         [studentId]: {
-          data: paymentsData,
+          data: paymentsData || [],
           timestamp: Date.now()
         }
       }));
       
-      return paymentsData;
+      return paymentsData || [];
     } catch (error) {
       console.error(`Error loading recent payments for student ${studentId}:`, error);
-      handleError(error);
       throw error;
     } finally {
       setLoadingStudentPayments(prev => ({ ...prev, [studentId]: false }));
@@ -687,6 +730,7 @@ const FeeCollection = () => {
   };
 
   const handleRefresh = async () => {
+    // Reset all loading states
     setIsLoading(true);
     setStatsLoading(true);
     setTrendLoading(true);
@@ -694,21 +738,31 @@ const FeeCollection = () => {
     setOverdueLoading(true);
     setRecentPaymentsLoading(true);
     setStudentsLoading(true);
-    setClassAnalyticsLoading(true);
+    
+    // Reset all error states
+    setStatsError(null);
+    setTrendError(null);
+    setPaymentMethodsError(null);
+    setOverdueError(null);
+    setRecentPaymentsError(null);
+    setStudentsError(null);
+    setClassAnalyticsError(null);
     
     try {
-      await Promise.all([
+      // Load all data independently
+      await Promise.allSettled([
         loadDashboardStats(),
         loadCollectionTrend(selectedTerm),
         loadPaymentMethods(),
         loadOverdueDistribution(),
         loadRecentPayments(5),
-        loadStudents(),
-        loadClassAnalytics()
+        loadStudents()
       ]);
-      showSuccessAlert('Data Refreshed', 'All fee collection data has been refreshed.');
+      
+      // Show success message only if at least one API succeeded
+      showSuccessAlert('Data Refreshed', 'Fee collection data has been refreshed.');
     } catch (error) {
-      showErrorAlert('Refresh Failed', 'Failed to refresh data. Please try again.');
+      // This won't be reached because we use allSettled
     } finally {
       setIsLoading(false);
     }
@@ -726,17 +780,151 @@ const FeeCollection = () => {
     }, 5000);
   };
 
-  // Handle viewing all transactions for a student
+  // FIXED: Show no payments modal with proper content
+  const showNoPaymentsModal = (student) => {
+    // Validate student object first
+    if (!student || !student.studentName) {
+      console.warn('Invalid student object passed to showNoPaymentsModal');
+      return;
+    }
+    
+    MySwal.fire({
+      title: <span className="text-gray-900">No Recent Payments</span>,
+      html: (
+        <div className="text-center py-6">
+          <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-900 font-medium">No recent payments found for {student.studentName}</p>
+          <p className="text-sm text-gray-600 mt-1">
+            {student.paymentCount > 0 
+              ? `This student has ${student.paymentCount} payment${student.paymentCount > 1 ? 's' : ''}, but none in the recent period.`
+              : 'No payments recorded for this student yet.'}
+          </p>
+          {student.paymentCount > 0 && (
+            <button
+              onClick={() => {
+                MySwal.close();
+                handleViewAllTransactions(student);
+              }}
+              className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <span>View all {student.paymentCount} transaction{student.paymentCount > 1 ? 's' : ''}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      ),
+      width: 450,
+      showConfirmButton: true,
+      confirmButtonText: 'Close',
+      confirmButtonColor: '#3b82f6',
+      showCloseButton: true,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl',
+        title: 'text-lg font-bold mb-2',
+        confirmButton: 'px-4 py-2 rounded-lg font-medium'
+      }
+    });
+  };
+
+  // FIXED: Show recent payments modal with proper validation
+  const showRecentPaymentsModal = (student, payments) => {
+    // Validate inputs
+    if (!student || !student.studentName) {
+      console.warn('Invalid student object');
+      return;
+    }
+    
+    if (!payments || !Array.isArray(payments)) {
+      console.warn('Invalid payments array');
+      return;
+    }
+
+    MySwal.fire({
+      title: <span className="text-gray-900">Recent Payments - {student.studentName}</span>,
+      html: (
+        <div className="text-left space-y-4 max-h-[60vh] overflow-y-auto p-2">
+          {payments.length === 0 ? (
+            <div className="text-center py-8">
+              <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-700">No recent payments found</p>
+              <button
+                onClick={() => {
+                  MySwal.close();
+                  handleViewAllTransactions(student);
+                }}
+                className="mt-4 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                View complete payment history
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="text-sm text-gray-600 mb-3">
+                Showing {payments.length} recent transaction{payments.length > 1 ? 's' : ''} 
+                {student.paymentCount > payments.length && (
+                  <span> of {student.paymentCount} total</span>
+                )}
+              </div>
+              
+              {payments.map((payment) => (
+                <PaymentTransactionCard 
+                  key={payment.id || payment.receiptNumber} 
+                  payment={payment} 
+                  student={student}
+                />
+              ))}
+              
+              {student.paymentCount > 5 && (
+                <div className="text-center pt-3 border-t border-gray-200">
+                  <button
+                    onClick={() => {
+                      MySwal.close();
+                      handleViewAllTransactions(student);
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1"
+                  >
+                    <span>View complete payment history ({student.paymentCount} transactions)</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      ),
+      width: 550,
+      showConfirmButton: false,
+      showCloseButton: true,
+      customClass: {
+        popup: 'rounded-2xl border border-gray-200 shadow-xl',
+        title: 'text-lg font-bold mb-4',
+        htmlContainer: 'p-2'
+      }
+    });
+  };
+
+  // FIXED: Handle view all transactions with error handling
   const handleViewAllTransactions = async (student) => {
+    if (!student || !student.studentId) {
+      showErrorAlert('Invalid Student', 'Cannot load transactions for this student.');
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const response = await feeApi.get(`/students/${student.studentId}/payment-history`);
       const history = handleResponse(response);
       
+      // Validate response
+      if (!history) {
+        throw new Error('No data received from server');
+      }
+      
       MySwal.fire({
         title: <span className="text-gray-900">Complete Payment History - {student.studentName}</span>,
         html: (
-          <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto">
+          <div className="text-left space-y-6 max-h-[70vh] overflow-y-auto p-2">
             {/* Student Summary */}
             <div className="p-4 bg-linear-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
               <div className="flex items-center justify-between">
@@ -826,7 +1014,6 @@ const FeeCollection = () => {
                                 minute: '2-digit'
                               })}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">{transaction.verifiedBy || 'System'}</p>
                           </div>
                         </div>
                         <div className="text-right">
@@ -840,20 +1027,6 @@ const FeeCollection = () => {
                           <p className="text-xs text-gray-600">{transaction.notes}</p>
                         </div>
                       )}
-                      
-                      {transaction.breakdown && transaction.breakdown.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-100">
-                          <p className="text-xs font-medium text-gray-700 mb-2">Fee Breakdown:</p>
-                          <div className="space-y-1">
-                            {transaction.breakdown.map((item, idx) => (
-                              <div key={idx} className="flex justify-between text-xs">
-                                <span className="text-gray-600">{item.category}</span>
-                                <span className="font-medium">KSh {item.amount?.toFixed(2)} ({item.percentage}%)</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -865,53 +1038,6 @@ const FeeCollection = () => {
                 </div>
               )}
             </div>
-
-            {/* Payment Summary */}
-            {history.summary && (
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-semibold text-gray-900 mb-3">Payment Summary</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Total Transactions</span>
-                    <span className="font-medium">{history.summary.totalTransactions || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">First Payment</span>
-                    <span className="font-medium">
-                      {history.summary.firstPayment ? 
-                        new Date(history.summary.firstPayment).toLocaleDateString('en-KE', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
-                        }) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Last Payment</span>
-                    <span className="font-medium">
-                      {history.summary.lastPayment ? 
-                        new Date(history.summary.lastPayment).toLocaleDateString('en-KE', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
-                        }) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Payment Methods Used</span>
-                    <span className="font-medium">
-                      {history.summary.paymentMethods?.join(', ') || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Average Payment Amount</span>
-                    <span className="font-medium">
-                      KSh {history.summary.averagePaymentAmount?.toLocaleString('en-KE') || '0'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         ),
         width: 700,
@@ -919,24 +1045,38 @@ const FeeCollection = () => {
         showCloseButton: true,
         customClass: {
           popup: 'rounded-2xl border border-gray-200 shadow-xl',
-          title: 'text-lg font-bold mb-4'
+          title: 'text-lg font-bold mb-4',
+          htmlContainer: 'p-2'
         }
       });
     } catch (error) {
       console.error('Error loading payment history:', error);
-      handleError(error);
-      showErrorAlert('Error', 'Failed to load payment history. Please try again.');
+      showErrorAlert(
+        'Error Loading History',
+        error.message || 'Failed to load payment history. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // FIXED: Enhanced Recent Payments Function with NEW endpoint
+  // FIXED: Handle show recent payments with better error handling
   const handleShowRecentPayments = async (student) => {
+    if (!student || !student.studentId) {
+      showErrorAlert('Invalid Student', 'Cannot load payments for this student.');
+      return;
+    }
+    
     const studentId = student.studentId;
     
     // Check if already loading
     if (loadingStudentPayments[studentId]) {
+      return;
+    }
+    
+    // If student has no payments, show appropriate modal
+    if (student.paymentCount === 0) {
+      showNoPaymentsModal(student);
       return;
     }
     
@@ -945,130 +1085,84 @@ const FeeCollection = () => {
     const cacheAge = cachedData ? Date.now() - cachedData.timestamp : Infinity;
     const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     
-    let payments;
-    
-    if (cachedData && cacheAge < CACHE_DURATION) {
+    if (cachedData && cacheAge < CACHE_DURATION && cachedData.data && cachedData.data.length > 0) {
       // Use cached data
-      payments = cachedData.data;
-    } else {
-      // Load fresh data
-      try {
-        payments = await loadStudentRecentPayments(studentId, 5);
-      } catch (error) {
-        // Handle error - show appropriate message
-        if (student.paymentCount > 0) {
-          showErrorAlert(
-            'Could not load recent payments',
-            `This student has ${student.paymentCount} payment${student.paymentCount > 1 ? 's' : ''} but we couldn't load the recent transactions.`
-          );
-        } else {
-          showNoPaymentsModal(student);
-        }
-        return;
-      }
+      showRecentPaymentsModal(student, cachedData.data);
+      return;
     }
     
-    // Show the modal
-    if (!payments || payments.length === 0) {
-      showNoPaymentsModal(student);
-    } else {
-      showRecentPaymentsModal(student, payments);
-    }
-  };
-
-  // FIXED: Show recent payments modal
-  const showRecentPaymentsModal = (student, payments) => {
-    const isLoading = loadingStudentPayments[student.studentId];
-
-    MySwal.fire({
-      title: <span className="text-gray-900">Recent Payments - {student.studentName}</span>,
-      html: (
-        <div className="text-left space-y-4 max-h-[60vh] overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-              <span className="ml-2 text-gray-600">Loading payments...</span>
+    // Load fresh data
+    setLoadingStudentPayments(prev => ({ ...prev, [studentId]: true }));
+    
+    try {
+      const response = await feeApi.get(`/students/${studentId}/recent-payments?limit=5`);
+      const paymentsData = handleResponse(response);
+      
+      // Validate response
+      if (!paymentsData) {
+        throw new Error('No payment data received');
+      }
+      
+      const paymentsArray = Array.isArray(paymentsData) ? paymentsData : [];
+      
+      // Cache the results
+      setStudentRecentPaymentsCache(prev => ({
+        ...prev,
+        [studentId]: {
+          data: paymentsArray,
+          timestamp: Date.now()
+        }
+      }));
+      
+      // Show modal with data (or empty state if no payments)
+      if (paymentsArray.length === 0) {
+        showNoPaymentsModal(student);
+      } else {
+        showRecentPaymentsModal(student, paymentsArray);
+      }
+      
+    } catch (error) {
+      console.error(`Error loading recent payments for student ${studentId}:`, error);
+      
+      // If API fails but student has paymentCount > 0, show message with fallback
+      if (student.paymentCount > 0) {
+        MySwal.fire({
+          title: <span className="text-gray-900">Could Not Load Recent Payments</span>,
+          html: (
+            <div className="text-center py-4">
+              <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+              <p className="text-gray-700 mb-2">Unable to load recent payments right now</p>
+              <p className="text-sm text-gray-600 mb-4">
+                This student has {student.paymentCount} payment{student.paymentCount > 1 ? 's' : ''} recorded.
+              </p>
+              <button
+                onClick={() => {
+                  MySwal.close();
+                  handleViewAllTransactions(student);
+                }}
+                className="inline-flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <span>View Complete History</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-          ) : (
-            <>
-              <div className="text-sm text-gray-600 mb-3">
-                Showing {payments.length} recent transaction{payments.length > 1 ? 's' : ''} 
-                {student.paymentCount > payments.length && (
-                  <span> of {student.paymentCount} total</span>
-                )}
-              </div>
-              
-              {payments.map((payment) => (
-                <PaymentTransactionCard 
-                  key={payment.id} 
-                  payment={payment} 
-                  student={student}
-                />
-              ))}
-              
-              {student.paymentCount > 5 && (
-                <div className="text-center pt-2 border-t border-gray-200">
-                  <button
-                    onClick={() => {
-                      MySwal.close();
-                      handleViewAllTransactions(student);
-                    }}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium mt-3 flex items-center justify-center gap-1 w-full"
-                  >
-                    <span>View complete payment history ({student.paymentCount} transactions)</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      ),
-      width: 500,
-      showConfirmButton: false,
-      showCloseButton: true,
-      customClass: {
-        popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold mb-4'
+          ),
+          width: 450,
+          showConfirmButton: true,
+          confirmButtonText: 'Close',
+          confirmButtonColor: '#6b7280',
+          showCloseButton: true,
+          customClass: {
+            popup: 'rounded-2xl border border-gray-200 shadow-xl',
+            title: 'text-lg font-bold mb-2'
+          }
+        });
+      } else {
+        showNoPaymentsModal(student);
       }
-    });
-  };
-
-  // FIXED: Show no payments modal
-  const showNoPaymentsModal = (student) => {
-    MySwal.fire({
-      title: <span className="text-gray-900">No Recent Payments</span>,
-      html: (
-        <div className="text-center py-6">
-          <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-900 font-medium">No recent payments found</p>
-          <p className="text-sm text-gray-600 mt-1">
-            {student.paymentCount > 0 
-              ? `This student has ${student.paymentCount} payment${student.paymentCount > 1 ? 's' : ''}, but none in the recent period.`
-              : 'No payments recorded for this student yet.'}
-          </p>
-          {student.paymentCount > 0 && (
-            <button
-              onClick={() => {
-                MySwal.close();
-                handleViewAllTransactions(student);
-              }}
-              className="mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center justify-center gap-1 mx-auto"
-            >
-              <span>View all {student.paymentCount} transaction{student.paymentCount > 1 ? 's' : ''}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      ),
-      width: 400,
-      showConfirmButton: false,
-      showCloseButton: true,
-      customClass: {
-        popup: 'rounded-2xl border border-gray-200 shadow-xl',
-        title: 'text-lg font-bold mb-4'
-      }
-    });
+    } finally {
+      setLoadingStudentPayments(prev => ({ ...prev, [studentId]: false }));
+    }
   };
 
   // Enhanced Email Reminder Function
@@ -1723,7 +1817,7 @@ School Accounts Department`}
     });
   }, [searchQuery, selectedClass, filterStatus, students]);
 
-  // Statistics from API data
+  // Statistics from API data with fallbacks
   const stats = useMemo(() => {
     if (!dashboardStats) {
       return {
@@ -1758,7 +1852,7 @@ School Accounts Department`}
     };
   }, [dashboardStats]);
 
-  // Chart data from API
+  // Chart data from API with fallbacks
   const collectionTrendData = useMemo(() => {
     return collectionTrend.map(point => ({
       month: new Date(point.date).toLocaleDateString('en-US', { month: 'short' }),
@@ -1846,11 +1940,26 @@ School Accounts Department`}
       await loadCollectionTrend(period);
     } catch (error) {
       console.error('Error changing trend period:', error);
-      handleError(error);
-    } finally {
-      setTrendLoading(false);
     }
   };
+
+  // Render empty state for chart when there's an error
+  const renderChartError = (message) => (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+        <p className="text-gray-700 font-medium">Unable to load data</p>
+        <p className="text-sm text-gray-500 mt-1">{message}</p>
+        <button
+          onClick={handleRefresh}
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Retry
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-blue-50/30 p-4 md:p-6">
@@ -1919,7 +2028,7 @@ School Accounts Department`}
       >
         <StatCard
           label="Total Collected"
-          value={statsLoading ? '...' : stats.totalCollected}
+          value={stats.totalCollected}
           icon={DollarSign}
           color="bg-gradient-to-br from-blue-500 to-blue-600"
           trend={stats.collectionTrend}
@@ -1928,7 +2037,7 @@ School Accounts Department`}
         />
         <StatCard
           label="Collection Rate"
-          value={statsLoading ? '...' : stats.collectionRate}
+          value={stats.collectionRate}
           icon={Percent}
           color="bg-gradient-to-br from-emerald-500 to-emerald-600"
           trend="+2.3%"
@@ -1937,7 +2046,7 @@ School Accounts Department`}
         />
         <StatCard
           label="Paid Students"
-          value={statsLoading ? '...' : `${stats.paidCount}/${students.length}`}
+          value={`${stats.paidCount}/${students.length}`}
           icon={UserCheck}
           color="bg-gradient-to-br from-green-500 to-green-600"
           trend={students.length > 0 ? `${(stats.paidCount/students.length * 100).toFixed(0)}%` : '0%'}
@@ -1946,7 +2055,7 @@ School Accounts Department`}
         />
         <StatCard
           label="Multiple Payments"
-          value={statsLoading ? '...' : `${stats.multiplePayments}/${students.length}`}
+          value={`${stats.multiplePayments}/${students.length}`}
           icon={Layers}
           color="bg-gradient-to-br from-purple-500 to-purple-600"
           trend="+5.2%"
@@ -1986,7 +2095,9 @@ School Accounts Department`}
             </div>
           </div>
           
-          {!trendLoading && collectionTrendData.length > 0 ? (
+          {trendError ? (
+            renderChartError(trendError)
+          ) : !trendLoading && collectionTrendData.length > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={collectionTrendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -2078,7 +2189,12 @@ School Accounts Department`}
               <PieChartIcon className="w-5 h-5 text-gray-400" />
             </div>
             
-            {!paymentMethodsLoading && paymentMethodsData.length > 0 ? (
+            {paymentMethodsError ? (
+              <div className="text-center py-8">
+                <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                <p className="text-gray-700">{paymentMethodsError}</p>
+              </div>
+            ) : !paymentMethodsLoading && paymentMethodsData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
@@ -2124,7 +2240,12 @@ School Accounts Department`}
               <AlertTriangle className="w-5 h-5 text-rose-400" />
             </div>
             
-            {!overdueLoading && overdueDistributionData.length > 0 ? (
+            {overdueError ? (
+              <div className="text-center py-8">
+                <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+                <p className="text-gray-700">{overdueError}</p>
+              </div>
+            ) : !overdueLoading && overdueDistributionData.length > 0 ? (
               <div className="space-y-4">
                 {overdueDistributionData.map((item, index) => (
                   <div key={index} className="space-y-2">
@@ -2181,7 +2302,12 @@ School Accounts Department`}
           </Link>
         </div>
 
-        {!recentPaymentsLoading && recentPayments.length > 0 ? (
+        {recentPaymentsError ? (
+          <div className="text-center py-12">
+            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+            <p className="text-gray-700">{recentPaymentsError}</p>
+          </div>
+        ) : !recentPaymentsLoading && recentPayments.length > 0 ? (
           <div className="space-y-3">
             {recentPayments.map((payment) => (
               <motion.div
@@ -2395,7 +2521,12 @@ School Accounts Department`}
 
         {/* Student List with Complete Payment History */}
         <div className="overflow-x-auto">
-          {!studentsLoading && filteredStudents.length > 0 ? (
+          {studentsError ? (
+            <div className="text-center py-12">
+              <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+              <p className="text-gray-700">{studentsError}</p>
+            </div>
+          ) : !studentsLoading && filteredStudents.length > 0 ? (
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
