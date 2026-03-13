@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.jsx
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -126,7 +125,7 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  // Login function
+  // Login function - UPDATED with approval status handling
   const login = async (credentials) => {
     try {
       const loginData = {
@@ -174,12 +173,25 @@ export const AuthProvider = ({ children }) => {
       });
       
       const message = error.response?.data?.message || 'Login failed. Please check your credentials.';
-      showAlert('error', 'Login Failed', message);
+      
+      // Special handling for pending/rejected messages
+      if (message.includes('pending approval')) {
+        showAlert('info', 'Registration Pending', message);
+      } else if (message.includes('rejected')) {
+        showAlert('error', 'Registration Rejected', message);
+      } else if (message.includes('Account is locked')) {
+        showAlert('warning', 'Account Locked', message);
+      } else if (message.includes('disabled')) {
+        showAlert('warning', 'Account Disabled', message);
+      } else {
+        showAlert('error', 'Login Failed', message);
+      }
+      
       return { success: false, message };
     }
   };
 
-  // Register function
+  // Register function - UPDATED with approval flow
   const register = async (userData) => {
     try {
       const registrationData = {
@@ -200,16 +212,31 @@ export const AuthProvider = ({ children }) => {
       console.log('📥 Registration response:', response.data);
       
       if (response.data.success) {
-        showAlert('success', 'Registration successful!', 'Please login with your credentials.');
+        showAlert(
+          'success', 
+          'Registration Submitted!', 
+          'Your registration has been submitted for approval. You will be notified once approved.'
+        );
         navigate('/login');
-        return { success: true, message: 'Registration successful' };
+        return { success: true, message: 'Registration submitted for approval' };
       } else {
         showAlert('error', 'Registration Failed', response.data.message);
         return { success: false, message: response.data.message };
       }
     } catch (error) {
       console.error('❌ Registration error:', error.response?.data);
-      const message = error.response?.data?.message || 'Registration failed';
+      
+      // Handle specific registration errors
+      let message = 'Registration failed';
+      
+      if (error.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error.response?.data?.errors) {
+        // Handle validation errors
+        const errors = error.response.data.errors;
+        message = Object.values(errors).join(', ');
+      }
+      
       showAlert('error', 'Registration Failed', message);
       return { success: false, message };
     }
@@ -330,6 +357,108 @@ export const AuthProvider = ({ children }) => {
     return requiredRoles.some(role => role.toUpperCase() === userRole);
   }, [user]);
 
+  // Admin functions for registration approval
+  const getPendingRegistrations = async () => {
+    try {
+      const response = await axiosInstance.get('/admin/auth/pending-registrations');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching pending registrations:', error);
+      showAlert('error', 'Failed to fetch pending registrations');
+      return { success: false, data: [] };
+    }
+  };
+
+  const getRegistrationStats = async () => {
+    try {
+      const response = await axiosInstance.get('/admin/auth/registrations/stats');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching registration stats:', error);
+      return { success: false, data: null };
+    }
+  };
+
+  const searchRegistrations = async (search, role) => {
+    try {
+      const response = await axiosInstance.get('/admin/auth/registrations/search', {
+        params: { search, role }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error searching registrations:', error);
+      showAlert('error', 'Failed to search registrations');
+      return { success: false, data: [] };
+    }
+  };
+
+  const getRegistrationDetails = async (userId) => {
+    try {
+      const response = await axiosInstance.get(`/admin/auth/registrations/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching registration details:', error);
+      showAlert('error', 'Failed to fetch registration details');
+      return { success: false, data: null };
+    }
+  };
+
+  const processRegistration = async (userId, status, rejectionReason = '', notes = '') => {
+    try {
+      const response = await axiosInstance.post(`/admin/auth/process-registration/${userId}`, {
+        status,
+        rejectionReason,
+        notes
+      });
+      
+      if (response.data.success) {
+        const action = status === 'APPROVED' ? 'approved' : 'rejected';
+        showAlert('success', `User ${action} successfully`);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error processing registration:', error);
+      showAlert('error', 'Failed to process registration');
+      return { success: false, message: error.response?.data?.message || 'Failed to process registration' };
+    }
+  };
+
+  const bulkApprove = async (userIds) => {
+    try {
+      const response = await axiosInstance.post('/admin/auth/bulk-approve', userIds);
+      
+      if (response.data.success) {
+        showAlert('success', `${userIds.length} users approved successfully`);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error bulk approving users:', error);
+      showAlert('error', 'Failed to bulk approve users');
+      return { success: false, message: error.response?.data?.message || 'Failed to bulk approve users' };
+    }
+  };
+
+  const bulkReject = async (userIds, reason) => {
+    try {
+      const response = await axiosInstance.post('/admin/auth/bulk-reject', {
+        userIds,
+        reason
+      });
+      
+      if (response.data.success) {
+        showAlert('success', `${userIds.length} users rejected successfully`);
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error bulk rejecting users:', error);
+      showAlert('error', 'Failed to bulk reject users');
+      return { success: false, message: error.response?.data?.message || 'Failed to bulk reject users' };
+    }
+  };
+
   // Context value
   const value = {
     // State
@@ -345,6 +474,15 @@ export const AuthProvider = ({ children }) => {
     getCurrentUser,
     changePassword,
     updateProfile,
+    
+    // Admin registration approval methods
+    getPendingRegistrations,
+    getRegistrationStats,
+    searchRegistrations,
+    getRegistrationDetails,
+    processRegistration,
+    bulkApprove,
+    bulkReject,
     
     // Role checks
     isAuthenticated: !!token,

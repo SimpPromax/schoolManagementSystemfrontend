@@ -3,165 +3,210 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../../contexts/AuthContext';
-import LoadingSpinner from '../common/LoadingSpinner';
+import { 
+  Home,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  LogIn,
+  User,
+  CheckCircle
+} from 'lucide-react';
+import { FaGoogle, FaFacebook, FaTwitter } from 'react-icons/fa';
 
 const Login = () => {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
 
   const { register, handleSubmit, formState: { errors } } = useForm();
 
   const onSubmit = async (data) => {
     setLoading(true);
-    setError('');
-    
     try {
-      // Your backend expects username field in LoginRequest DTO
-      // Users can enter either username or email, but backend expects "username" field
-      const loginData = {
-        username: data.email, // Map email to username for backend
-        password: data.password,
-        rememberMe: false
-      };
-      
-      console.log('Attempting login with:', loginData);
-      
-      const result = await login(loginData);
-      if (!result.success) {
-        setError(result.message || 'Login failed');
-      }
+      await login(data);
     } catch (error) {
       console.error('Login error:', error);
-      setError('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-gray-100 p-4">
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="bg-white p-8 rounded-2xl shadow-lg">
-          {/* Logo & Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 7l9-5-9-5-9 5 9 5z" />
-              </svg>
+    <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-yellow-50 flex items-center justify-center p-4 relative overflow-hidden">
+      
+      {/* Animated background elements - matching Home page */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-20 left-10 w-96 h-96 bg-yellow-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float"></div>
+        <div className="absolute top-40 right-10 w-96 h-96 bg-orange-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float animation-delay-2000"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-green-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float animation-delay-4000"></div>
+      </div>
+
+      {/* Mobile-friendly container with Home page styling */}
+      <div className="w-full max-w-md bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-4 sm:p-6 md:p-8 relative z-10 border border-orange-100">
+        
+        {/* Home Button - Matching Home page style */}
+        <Link 
+          to="/" 
+          className="absolute top-4 left-4 sm:top-6 sm:left-6 flex items-center text-gray-600 hover:text-orange-600 transition-all group bg-white/80 backdrop-blur-sm px-3 py-2 rounded-full shadow-md hover:shadow-xl"
+          aria-label="Go to home"
+        >
+          <Home className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
+          <span className="ml-2 text-xs sm:text-sm font-medium group-hover:underline">
+            Back to Home
+          </span>
+        </Link>
+
+        {/* Decorative element */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-orange-200 rounded-full opacity-20 blur-2xl"></div>
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-yellow-200 rounded-full opacity-20 blur-2xl"></div>
+
+        {/* Header with Home page styling */}
+        <div className="text-center mt-8 sm:mt-6 mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-linear-to-br from-orange-500 to-yellow-500 rounded-full mb-3 sm:mb-4 shadow-lg transform hover:scale-105 transition-transform">
+            <LogIn className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold">
+            <span className="bg-linear-to-r from-orange-600 to-yellow-600 bg-clip-text text-transparent">
+              Welcome Back
+            </span>
+          </h2>
+          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">
+            Sign in to continue your journey
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
+          {/* Username/Email field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+              <span className="flex items-center gap-2">
+                <Mail className="text-orange-500" size={16} />
+                Username or Email
+              </span>
+            </label>
+            <div className="relative group">
+              <input
+                type="text"
+                {...register('username', { required: 'Username is required' })}
+                className="w-full px-4 py-3 sm:py-3.5 text-sm sm:text-base bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all pl-11"
+                placeholder="Enter your username or email"
+              />
+              <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={18} />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">School Management System</h1>
-            <p className="text-gray-600 mt-2">Sign in to your account</p>
+            {errors.username && (
+              <p className="mt-1 text-xs sm:text-sm text-red-600 flex items-center gap-1">
+                <CheckCircle className="text-red-600" size={14} />
+                {errors.username.message}
+              </p>
+            )}
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          {/* Login Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email or Username *
-              </label>
+          {/* Password field */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
+              <span className="flex items-center gap-2">
+                <Lock className="text-orange-500" size={16} />
+                Password
+              </span>
+            </label>
+            <div className="relative group">
               <input
-                id="email"
-                type="text"
-                {...register('email', { 
-                  required: 'Email or username is required'
-                })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                placeholder="Enter your email or username"
+                type={showPassword ? 'text' : 'password'}
+                {...register('password', { required: 'Password is required' })}
+                className="w-full px-4 py-3 sm:py-3.5 text-sm sm:text-base bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all pl-11 pr-12"
+                placeholder="Enter your password"
               />
-              {errors.email && (
-                <p className="mt-2 text-sm text-red-600">{errors.email.message}</p>
-              )}
+              <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors" size={18} />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-orange-600 transition-colors bg-gray-100 hover:bg-orange-100 p-1.5 rounded-full"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
+            {errors.password && (
+              <p className="mt-1 text-xs sm:text-sm text-red-600 flex items-center gap-1">
+                <CheckCircle className="text-red-600" size={14} />
+                {errors.password.message}
+              </p>
+            )}
+          </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password *
+          {/* Remember me and Forgot password */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="remember-me"
+                className="h-4 w-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
+              />
+              <label htmlFor="remember-me" className="ml-2 text-xs sm:text-sm text-gray-700">
+                Remember me
               </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  {...register('password', { required: 'Password is required' })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition pr-10"
-                  placeholder="Enter your password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
-                >
-                  {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="mt-2 text-sm text-red-600">{errors.password.message}</p>
-              )}
             </div>
+            <Link to="/forgot-password" className="text-xs sm:text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors">
+              Forgot password?
+            </Link>
+          </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                  Remember me
-                </label>
-              </div>
-              <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
-                Forgot password?
-              </Link>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-            >
+          {/* Submit button with Home page styling */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full relative overflow-hidden rounded-xl bg-linear-to-r from-orange-600 to-yellow-600 text-white py-3.5 sm:py-4 px-4 text-sm sm:text-base font-semibold transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 group"
+          >
+            <span className="relative z-10 flex items-center justify-center gap-2">
               {loading ? (
                 <>
-                  <LoadingSpinner size="sm" color="white" />
-                  <span className="ml-2">Signing in...</span>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Signing in...</span>
                 </>
               ) : (
-                'Sign in'
+                <>
+                  <LogIn className="group-hover:rotate-12 transition-transform" size={18} />
+                  <span>Sign In</span>
+                </>
               )}
-            </button>
-          </form>
+            </span>
+          </button>
 
-          {/* Register Link */}
-          <div className="mt-8 text-center">
-            <p className="text-gray-600">
-              Don't have an account?{' '}
-              <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
-                Sign up
-              </Link>
-            </p>
-          </div>
+        </form>
 
-          
+        {/* Register link */}
+        <div className="mt-6 sm:mt-8 text-center">
+          <p className="text-xs sm:text-sm text-gray-600">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-orange-600 hover:text-orange-700 font-semibold transition-colors">
+              Sign up
+            </Link>
+          </p>
         </div>
+
+
       </div>
+
+      {/* Custom animations from Home page */}
+      <style jsx>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-30px) rotate(5deg); }
+        }
+        .animate-float {
+          animation: float 8s ease-in-out infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+      `}</style>
     </div>
   );
 };

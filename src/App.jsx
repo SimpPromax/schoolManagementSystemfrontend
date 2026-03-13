@@ -24,12 +24,13 @@ import AssignmentManager from './components/teacher/AssignmentManager';
 import TeacherProfile from './components/teacher/Profile';
 import MyClasses from './components/teacher/MyClasses';
 
-// Admin Components - Create placeholder components if they don't exist
-const AdminDashboard = () => <div className="p-8"><h1 className="text-3xl font-bold">Admin Dashboard</h1><p>Welcome to Admin Panel</p></div>;
-const UserManagement = () => <div className="p-8"><h1 className="text-3xl font-bold">User Management</h1></div>;
-const CourseManagement = () => <div className="p-8"><h1 className="text-3xl font-bold">Course Management</h1></div>;
+// Admin Components
+import AdminDashboard from './components/admin/Dashboard';
+import UserManagement from './components/admin/UserManagement';
+import CourseManagement from './components/admin/CourseManagement';
+import RegistrationApprovals from './components/admin/RegistrationApprovals'; // NEW IMPORT
 
-// Parent Components - Create placeholder components if they don't exist
+// Parent Components
 const ParentDashboard = () => <div className="p-8"><h1 className="text-3xl font-bold">Parent Dashboard</h1><p>Welcome Parent</p></div>;
 const ChildProgress = () => <div className="p-8"><h1 className="text-3xl font-bold">Child Progress</h1></div>;
 
@@ -92,7 +93,7 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Route>
 
-          {/* Admin Routes */}
+          {/* Admin Routes - UPDATED with RegistrationApprovals */}
           <Route
             path="/admin/*"
             element={
@@ -104,6 +105,7 @@ function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="users" element={<UserManagement />} />
+            <Route path="registrations" element={<RegistrationApprovals />} /> {/* NEW ROUTE */}
             <Route path="courses" element={<CourseManagement />} />
             <Route path="*" element={<NotFound />} />
           </Route>
@@ -123,7 +125,7 @@ function App() {
             <Route path="*" element={<NotFound />} />
           </Route>
 
-          {/* Accountant Routes - ONLY ACCOUNTANT role */}
+          {/* Accountant Routes */}
           <Route
             path="/accountant/*"
             element={
@@ -144,12 +146,11 @@ function App() {
             <Route path="term-fees/management" element={<TermManagement />} />
             <Route path="term-fees/structures" element={<FeeStructureManager />} />
             <Route path="term-fees/additional-fees" element={<AdditionalFeeAllocation />} />
-
             
             <Route path="*" element={<NotFound />} />
           </Route>
 
-          {/* Staff Routes (if you want separate routes for STAFF) */}
+          {/* Staff Routes */}
           <Route
             path="/staff/*"
             element={
