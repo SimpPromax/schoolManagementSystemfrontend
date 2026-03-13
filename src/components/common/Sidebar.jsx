@@ -154,7 +154,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                   <School className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-gray-900">Springfield High</h2>
+                  <h2 className="font-bold text-gray-900">Ig-BesthoodAcademy</h2>
                   <p className="text-xs text-gray-500 capitalize">{role} Portal</p>
                 </div>
               </div>
@@ -267,7 +267,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <School className="w-7 h-7 text-blue-600" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Springfield High</h1>
+                <h1 className="text-xl font-bold text-gray-900">Ig-BesthoodAcademy</h1>
                 <p className="text-xs text-gray-500/80 capitalize mt-1">{role} Portal</p>
               </div>
             </div>

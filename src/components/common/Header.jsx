@@ -30,7 +30,7 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
       '/accountant/term-fees/additional-fees': 'Additional Fees',
       '/accountant/term-fees/reports': 'Fee Reports',
     };
-    return titles[path] || 'Springfield High School Portal';
+    return titles[path] || 'Ig-BesthoodAcademy';
   };
 
   // Get user initials for avatar

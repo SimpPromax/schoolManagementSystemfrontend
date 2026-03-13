@@ -1,8 +1,63 @@
 import React from 'react';
 import { CreditCard, Download, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext'; // Import useAuth
 
 const FeePayments = () => {
+  const { user, isAuthenticated } = useAuth(); // Get user from AuthContext
+
+  // Get current school year (based on academic calendar)
+  const getSchoolYear = () => {
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = today.getMonth() + 1 // 1-12 (January = 1)
+    
+    // School year starts in January
+    if (currentMonth >= 1) {
+      return `${currentYear}-${currentYear + 1}`
+    } else {
+      return `${currentYear - 1}-${currentYear}`
+    }
+  }
+
+  // Get student name
+  const getStudentName = () => {
+    if (user?.fullName) return user.fullName
+    if (user?.username) return user.username
+    if (user?.email) return user.email.split('@')[0]
+    return 'Student'
+  }
+
+  // Get student ID
+  const getStudentId = () => {
+    if (user?.studentId) return user.studentId
+    if (user?.id) return `STU${user.id.toString().padStart(6, '0')}`
+    return 'STU20240025' // fallback
+  }
+
+  // Get father's name
+  const getFatherName = () => {
+    if (user?.fatherName) return user.fatherName
+    if (user?.parentName) return user.parentName
+    if (user?.guardianName) return user.guardianName
+    return 'Robert Smith' // fallback
+  }
+
+  // Get parent contact email
+  const getParentEmail = () => {
+    if (user?.parentEmail) return user.parentEmail
+    if (user?.guardianEmail) return user.guardianEmail
+    if (user?.email) return user.email
+    return 'parent@email.com' // fallback
+  }
+
+  // Get student class
+  const getStudentClass = () => {
+    if (user?.studentClass) return user.studentClass
+    if (user?.grade) return user.grade
+    return '10-A' // fallback
+  }
+
   const feeStructure = [
     { component: 'Tuition Fee', amount: 45000, status: 'paid' },
     { component: 'Laboratory Charges', amount: 8000, status: 'paid' },
@@ -19,23 +74,36 @@ const FeePayments = () => {
     { date: '15-Jan-25', amount: 5500, mode: '-', receipt: '-', status: 'due' },
   ];
 
+  // Calculate totals
+  const totalAmount = feeStructure.reduce((sum, fee) => sum + fee.amount, 0);
+  const paidAmount = feeStructure.filter(fee => fee.status === 'paid').reduce((sum, fee) => sum + fee.amount, 0);
+  const dueAmount = totalAmount - paidAmount;
+  const paidPercentage = ((paidAmount / totalAmount) * 100).toFixed(1);
+  const duePercentage = ((dueAmount / totalAmount) * 100).toFixed(1);
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-900">Fee Payments - John Smith</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+        <h1 className="text-2xl font-bold text-gray-900">
+          Fee Payments - {getStudentName()}
+        </h1>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
           <div>
             <p className="text-sm text-gray-600">Student ID</p>
-            <p className="font-medium">STU20240025</p>
+            <p className="font-medium">{getStudentId()}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Class</p>
+            <p className="font-medium">{getStudentClass()}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Father's Name</p>
-            <p className="font-medium">Robert Smith</p>
+            <p className="font-medium">{getFatherName()}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Contact</p>
-            <p className="font-medium">robert.smith@email.com</p>
+            <p className="font-medium">{getParentEmail()}</p>
           </div>
         </div>
       </div>
@@ -43,7 +111,9 @@ const FeePayments = () => {
       {/* Annual Fee Structure */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">ANNUAL FEE STRUCTURE (2024-2025)</h2>
+          <h2 className="text-xl font-semibold">
+            ANNUAL FEE STRUCTURE ({getSchoolYear()})
+          </h2>
           <button className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
             <Download className="w-4 h-4" />
             Download Invoice
@@ -90,12 +160,12 @@ const FeePayments = () => {
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <div className="flex justify-between items-center">
             <div>
-              <span className="font-semibold">TOTAL: ₹64,500</span>
-              <p className="text-sm text-gray-600">Annual Fee</p>
+              <span className="font-semibold">TOTAL: ₹{totalAmount.toLocaleString('en-IN')}</span>
+              <p className="text-sm text-gray-600">Annual Fee • Academic Year {getSchoolYear()}</p>
             </div>
             <div className="text-right">
-              <span className="font-bold text-green-700">PAID: ₹59,000</span>
-              <p className="text-sm text-red-600">DUE: ₹5,500</p>
+              <span className="font-bold text-green-700">PAID: ₹{paidAmount.toLocaleString('en-IN')}</span>
+              <p className="text-sm text-red-600">DUE: ₹{dueAmount.toLocaleString('en-IN')}</p>
             </div>
           </div>
         </div>
@@ -163,7 +233,7 @@ const FeePayments = () => {
               Upcoming Payments
             </h2>
             <span className="inline-flex px-3 py-1 text-sm font-medium bg-yellow-100 text-yellow-700 rounded-full">
-              1 pending
+              {feeStructure.filter(fee => fee.status === 'pending').length} pending
             </span>
           </div>
 
@@ -173,8 +243,8 @@ const FeePayments = () => {
                 <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
                 <div className="flex-1">
                   <h3 className="font-bold text-lg mb-2">Next Installment Due</h3>
-                  <p className="text-red-700 font-medium text-lg">₹5,500</p>
-                  <p className="text-sm text-gray-600">Due by Jan 15, 2025</p>
+                  <p className="text-red-700 font-medium text-lg">₹{dueAmount.toLocaleString('en-IN')}</p>
+                  <p className="text-sm text-gray-600">Due by Jan 15, {new Date().getFullYear() + 1}</p>
                   <div className="mt-4 flex gap-2">
                     <button className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                       Pay Now
@@ -193,7 +263,7 @@ const FeePayments = () => {
                 <div>
                   <h3 className="font-medium mb-1">Late Fee Notice</h3>
                   <p className="text-sm text-gray-600">
-                    Late fee of ₹550 will be charged after Jan 31, 2025
+                    Late fee of ₹550 will be charged after Jan 31, {new Date().getFullYear() + 1}
                   </p>
                 </div>
               </div>
@@ -218,24 +288,30 @@ const FeePayments = () => {
 
       {/* Payment Summary */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-6">Payment Summary</h2>
+        <h2 className="text-xl font-semibold mb-6">Payment Summary - {getStudentName()}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-4 bg-green-50 rounded-lg">
-            <div className="text-3xl font-bold text-green-600">91.5%</div>
+            <div className="text-3xl font-bold text-green-600">{paidPercentage}%</div>
             <div className="text-gray-600">Fee Paid</div>
-            <p className="text-sm text-gray-500 mt-2">₹59,000 of ₹64,500</p>
+            <p className="text-sm text-gray-500 mt-2">
+              ₹{paidAmount.toLocaleString('en-IN')} of ₹{totalAmount.toLocaleString('en-IN')}
+            </p>
           </div>
 
           <div className="p-4 bg-red-50 rounded-lg">
-            <div className="text-3xl font-bold text-red-600">8.5%</div>
+            <div className="text-3xl font-bold text-red-600">{duePercentage}%</div>
             <div className="text-gray-600">Fee Due</div>
-            <p className="text-sm text-gray-500 mt-2">₹5,500 remaining</p>
+            <p className="text-sm text-gray-500 mt-2">
+              ₹{dueAmount.toLocaleString('en-IN')} remaining
+            </p>
           </div>
 
           <div className="p-4 bg-blue-50 rounded-lg">
-            <div className="text-3xl font-bold text-blue-600">4</div>
+            <div className="text-3xl font-bold text-blue-600">{paymentHistory.length}</div>
             <div className="text-gray-600">Total Payments</div>
-            <p className="text-sm text-gray-500 mt-2">3 paid, 1 pending</p>
+            <p className="text-sm text-gray-500 mt-2">
+              {paymentHistory.filter(p => p.status === 'paid').length} paid, {paymentHistory.filter(p => p.status === 'due').length} pending
+            </p>
           </div>
         </div>
       </div>

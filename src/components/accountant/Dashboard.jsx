@@ -6,8 +6,62 @@ import {
   ArrowUpRight, ArrowDownRight
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext' // Import useAuth
 
 const AccountantDashboard = () => {
+  const { user, isAuthenticated } = useAuth() // Get user from AuthContext
+
+  // Get current school year (based on academic calendar)
+  const getSchoolYear = () => {
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = today.getMonth() + 1 // 1-12 (January = 1)
+    
+    // School year typically starts in January
+    // If current month is January (1) or later, school year is currentYear-currentYear+1
+    // Example: In March 2026 -> 2026-2027
+    if (currentMonth >= 1) {
+      return `${currentYear}-${currentYear + 1}`
+    } else {
+      return `${currentYear - 1}-${currentYear}`
+    }
+  }
+
+  // Get current month name
+  const getCurrentMonth = () => {
+    const today = new Date()
+    return today.toLocaleString('default', { month: 'long' })
+  }
+
+  // Get user display name
+  const getUserDisplayName = () => {
+    if (user?.fullName) return user.fullName
+    if (user?.username) return user.username
+    if (user?.email) return user.email.split('@')[0]
+    return 'Accountant'
+  }
+
+  // Get user role display
+  const getUserRoleDisplay = () => {
+    if (!user?.role) return 'Accountant'
+    // Capitalize and format the role
+    const role = user.role.toLowerCase()
+    if (role === 'accountant') return 'Chief Accountant'
+    if (role === 'staff') return 'Finance Staff'
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+  }
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user?.fullName) return 'A'
+    
+    const nameParts = user.fullName.trim().split(' ')
+    if (nameParts.length === 1) {
+      return nameParts[0].charAt(0).toUpperCase()
+    }
+    return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase()
+  }
+
   const financialOverview = [
     { category: 'Fee Collection', budget: 'KSH 25M', spent: 'KSH 18.0M', balance: 'KSH 7.0M', percentage: 72, trend: 'up' },
     { category: 'Salary', budget: 'KSH 7.5M', spent: 'KSH 4.5M', balance: 'KSH 3.0M', percentage: 60, trend: 'up' },
@@ -52,7 +106,9 @@ const AccountantDashboard = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Finance Dashboard</h1>
-            <p className="text-gray-600 mt-1">Springfield High School • FY: 2024-2025</p>
+            <p className="text-gray-600 mt-1">
+              Ig-BesthoodAcademy • Academic Year: {getSchoolYear()} • {getCurrentMonth()} {new Date().getFullYear()}
+            </p>
           </div>
           <div className="flex items-center gap-3 mt-4 md:mt-0">
             <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg flex items-center gap-2 hover:bg-gray-50 transition-colors">
@@ -70,16 +126,22 @@ const AccountantDashboard = () => {
           </div>
         </div>
 
-        {/* Welcome Card */}
+        {/* Welcome Card with Dynamic User Info */}
         <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-2xl p-6 text-white mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold mb-2">Welcome back, Rajesh Kumar!</h2>
-              <p className="text-blue-100">Chief Accountant • ID: ACC2023005</p>
+              <h2 className="text-xl font-semibold mb-2">
+                Welcome back, {getUserDisplayName()}
+              </h2>
+              <p className="text-blue-100">
+                {getUserRoleDisplay()} 
+              </p>
               <div className="flex items-center gap-4 mt-4">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span className="text-sm">Last login: Today, 09:42 AM</span>
+                  <span className="text-sm">
+                    Last login: Today, {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
                 <div className="hidden md:block">
                   <span className="text-sm bg-blue-500/30 px-3 py-1 rounded-full">Session Active</span>
@@ -129,6 +191,7 @@ const AccountantDashboard = () => {
         </div>
       </div>
 
+      {/* Rest of your component remains the same */}
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         
@@ -197,7 +260,7 @@ const AccountantDashboard = () => {
                 <div>
                   <p className="font-semibold text-gray-900">TOTAL ANNUAL BUDGET</p>
                   <p className="text-2xl font-bold text-blue-700">KSH 36.5M</p>
-                  <p className="text-sm text-gray-600">FY 2024-2025 Allocation</p>
+                  <p className="text-sm text-gray-600">Academic Year {getSchoolYear()}</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-center">

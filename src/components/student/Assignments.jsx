@@ -1,8 +1,63 @@
 import React from 'react';
 import { Calendar, Clock, CheckCircle, AlertTriangle, Upload, FileText, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext'; // Import useAuth
 
 const Assignments = () => {
+  const { user, isAuthenticated } = useAuth(); // Get user from AuthContext
+
+  // Get current school year (based on academic calendar)
+  const getSchoolYear = () => {
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = today.getMonth() + 1 // 1-12 (January = 1)
+    
+    // School year starts in January
+    if (currentMonth >= 1) {
+      return `${currentYear}-${currentYear + 1}`
+    } else {
+      return `${currentYear - 1}-${currentYear}`
+    }
+  }
+
+  // Get current term based on month
+  const getCurrentTerm = () => {
+    const today = new Date()
+    const currentMonth = today.getMonth() + 1 // 1-12
+    
+    if (currentMonth >= 1 && currentMonth <= 3) {
+      return 'Term 1'
+    } else if (currentMonth >= 4 && currentMonth <= 6) {
+      return 'Term 2'
+    } else if (currentMonth >= 7 && currentMonth <= 9) {
+      return 'Term 3'
+    } else {
+      return 'Term 4'
+    }
+  }
+
+  // Get student name
+  const getStudentName = () => {
+    if (user?.fullName) return user.fullName
+    if (user?.username) return user.username
+    if (user?.email) return user.email.split('@')[0]
+    return 'Student'
+  }
+
+  // Get student class
+  const getStudentClass = () => {
+    if (user?.studentClass) return user.studentClass
+    if (user?.grade) return user.grade
+    return '10-A' // fallback
+  }
+
+  // Get student ID
+  const getStudentId = () => {
+    if (user?.studentId) return user.studentId
+    if (user?.id) return `STU${user.id.toString().padStart(5, '0')}`
+    return 'STU2024001' // fallback
+  }
+
   const pendingAssignments = [
     {
       subject: 'Mathematics',
@@ -57,25 +112,80 @@ const Assignments = () => {
     }
   ];
 
+  // Calculate statistics
+  const totalSubmitted = submittedAssignments.length;
+  const totalPending = pendingAssignments.length;
+  const averageScore = Math.round(
+    submittedAssignments.reduce((sum, a) => sum + (a.marks / a.maxMarks * 100), 0) / submittedAssignments.length
+  );
+  const lateSubmissions = 3; // This would come from actual data in a real app
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex justify-between items-start">
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+
+        {/* Left Section */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Homework & Assignments - John Smith</h1>
-          <p className="text-gray-600 mt-2">Track and submit your assignments</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+            Homework & Assignments
+          </h1>
+
+          <p className="text-gray-500 mt-1">
+            Track and submit your assignments — {getStudentName()}
+          </p>
+
+          {/* Student Info */}
+          <div className="flex flex-wrap items-center gap-3 mt-4 text-sm">
+
+            <span className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg font-medium">
+              <BookOpen className="w-4 h-4" />
+              Academic Year: {getSchoolYear()}
+            </span>
+
+            <span className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg">
+              Student ID: {getStudentId()}
+            </span>
+
+            <span className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+              Class: {getStudentClass()}
+            </span>
+
+            <span className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg">
+              Term: {getCurrentTerm()}
+            </span>
+
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <select className="border border-gray-300 rounded-lg px-3 py-2">
+
+        {/* Right Section */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+
+          {/* Subject Filter */}
+          <select className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
             <option>All Subjects</option>
             <option>Mathematics</option>
             <option>Science</option>
             <option>English</option>
           </select>
-          <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-gray-200 text-gray-800 rounded-full">
-            Pending & Submitted
-          </span>
+
+          {/* Assignment Status */}
+          <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl text-sm font-medium">
+
+            <span className="text-orange-600">
+              {totalPending} Pending
+            </span>
+
+            <span className="text-gray-400">•</span>
+
+            <span className="text-green-600">
+              {totalSubmitted} Submitted
+            </span>
+
+          </div>
+
         </div>
+
       </div>
 
       {/* Pending Assignments */}
@@ -86,7 +196,7 @@ const Assignments = () => {
             PENDING ASSIGNMENTS ({pendingAssignments.length})
           </h2>
           <span className="inline-flex items-center px-3 py-1 text-sm font-medium bg-red-100 text-red-700 rounded-full">
-            2 overdue soon
+            {pendingAssignments.filter(a => a.status === 'not-started').length} not started
           </span>
         </div>
 
@@ -232,27 +342,29 @@ const Assignments = () => {
 
       {/* Assignment Statistics */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-6">Assignment Statistics</h2>
+        <h2 className="text-xl font-semibold mb-6">Assignment Statistics - {getStudentName()}</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="p-4 bg-green-50 rounded-lg text-center">
-            <div className="text-3xl font-bold text-green-600">12</div>
+            <div className="text-3xl font-bold text-green-600">{totalSubmitted}</div>
             <div className="text-gray-600">Submitted</div>
-            <p className="text-sm text-gray-500 mt-2">This semester</p>
+            <p className="text-sm text-gray-500 mt-2">{getCurrentTerm()} {new Date().getFullYear()}</p>
           </div>
           <div className="p-4 bg-red-50 rounded-lg text-center">
-            <div className="text-3xl font-bold text-red-600">2</div>
+            <div className="text-3xl font-bold text-red-600">{totalPending}</div>
             <div className="text-gray-600">Pending</div>
-            <p className="text-sm text-gray-500 mt-2">1 due tomorrow</p>
+            <p className="text-sm text-gray-500 mt-2">
+              {pendingAssignments.filter(a => a.status === 'not-started').length} not started
+            </p>
           </div>
           <div className="p-4 bg-blue-50 rounded-lg text-center">
-            <div className="text-3xl font-bold text-blue-600">88%</div>
+            <div className="text-3xl font-bold text-blue-600">{averageScore}%</div>
             <div className="text-gray-600">Average Score</div>
             <p className="text-sm text-gray-500 mt-2">Across all subjects</p>
           </div>
           <div className="p-4 bg-yellow-50 rounded-lg text-center">
-            <div className="text-3xl font-bold text-yellow-600">3</div>
+            <div className="text-3xl font-bold text-yellow-600">{lateSubmissions}</div>
             <div className="text-gray-600">Late Submissions</div>
-            <p className="text-sm text-gray-500 mt-2">This academic year</p>
+            <p className="text-sm text-gray-500 mt-2">Academic Year {getSchoolYear()}</p>
           </div>
         </div>
       </div>

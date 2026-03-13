@@ -22,6 +22,7 @@ import TeacherDashboard from './components/teacher/Dashboard';
 import Gradebook from './components/teacher/Gradebook';
 import AssignmentManager from './components/teacher/AssignmentManager';
 import TeacherProfile from './components/teacher/Profile';
+import MyClasses from './components/teacher/MyClasses';
 
 // Admin Components - Create placeholder components if they don't exist
 const AdminDashboard = () => <div className="p-8"><h1 className="text-3xl font-bold">Admin Dashboard</h1><p>Welcome to Admin Panel</p></div>;
@@ -86,7 +87,7 @@ function App() {
             <Route path="dashboard" element={<TeacherDashboard />} />
             <Route path="gradebook" element={<Gradebook />} />
             <Route path="assignments" element={<AssignmentManager />} />
-            <Route path="classes" element={<div className="p-8"><h1 className="text-3xl font-bold">My Classes</h1><p>Class management coming soon</p></div>} />
+            <Route path="classes" element={<MyClasses />} />
             <Route path="profile" element={<TeacherProfile />} />
             <Route path="*" element={<NotFound />} />
           </Route>

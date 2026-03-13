@@ -1,8 +1,70 @@
 import React from 'react';
 import { BookOpen, Users, Award, TrendingUp, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext'; // Import useAuth
 
 const AcademicRecords = () => {
+  const { user, isAuthenticated } = useAuth(); // Get user from AuthContext
+
+  // Get current school year (based on academic calendar)
+  const getSchoolYear = () => {
+    const today = new Date()
+    const currentYear = today.getFullYear()
+    const currentMonth = today.getMonth() + 1 // 1-12 (January = 1)
+    
+    // School year starts in January
+    if (currentMonth >= 1) {
+      return `${currentYear}-${currentYear + 1}`
+    } else {
+      return `${currentYear - 1}-${currentYear}`
+    }
+  }
+
+  // Get current term based on month
+  const getCurrentTerm = () => {
+    const today = new Date()
+    const currentMonth = today.getMonth() + 1 // 1-12
+    
+    if (currentMonth >= 1 && currentMonth <= 3) {
+      return { term: 'Term 1', months: 'Jan-Mar', year: today.getFullYear() }
+    } else if (currentMonth >= 4 && currentMonth <= 6) {
+      return { term: 'Term 2', months: 'Apr-Jun', year: today.getFullYear() }
+    } else if (currentMonth >= 7 && currentMonth <= 9) {
+      return { term: 'Term 3', months: 'Jul-Sep', year: today.getFullYear() }
+    } else {
+      return { term: 'Term 4', months: 'Oct-Dec', year: today.getFullYear() }
+    }
+  }
+
+  // Get student name
+  const getStudentName = () => {
+    if (user?.fullName) return user.fullName
+    if (user?.username) return user.username
+    if (user?.email) return user.email.split('@')[0]
+    return 'Student'
+  }
+
+  // Get student class
+  const getStudentClass = () => {
+    if (user?.studentClass) return user.studentClass
+    if (user?.grade) return user.grade
+    return '10-A' // fallback
+  }
+
+  // Get roll number
+  const getRollNumber = () => {
+    if (user?.rollNumber) return user.rollNumber
+    if (user?.studentId) return user.studentId.slice(-2) // Get last 2 digits of student ID
+    return '25' // fallback
+  }
+
+  // Get student ID
+  const getStudentId = () => {
+    if (user?.studentId) return user.studentId
+    if (user?.id) return `STU${user.id.toString().padStart(5, '0')}`
+    return 'STU2024001' // fallback
+  }
+
   const subjects = [
     { name: 'Mathematics', max: 100, obtained: 85, grade: 'A', teacher: 'Ms. Sharma', percentage: 85 },
     { name: 'Science', max: 100, obtained: 88, grade: 'A', teacher: 'Mr. Patel', percentage: 88 },
@@ -27,21 +89,30 @@ const AcademicRecords = () => {
     { activity: 'Debate Competition', role: 'Participant', achievement: '2nd Prize - District Level' },
   ];
 
+  const currentTerm = getCurrentTerm();
+
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex justify-between items-start">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col md:flex-row justify-between items-start gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Academic Records - John Smith</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Academic Records - {getStudentName()}
+          </h1>
           <div className="flex flex-wrap items-center gap-4 mt-2 text-gray-600 text-sm">
             <span className="flex items-center gap-1">
               <BookOpen className="w-4 h-4" />
-              ACADEMIC YEAR: 2024-2025
+              ACADEMIC YEAR: {getSchoolYear()}
             </span>
             <span>|</span>
-            <span>CLASS: 10-A</span>
+            <span>STUDENT ID: {getStudentId()}</span>
             <span>|</span>
-            <span>ROLL NO: 25</span>
+            <span>CLASS: {getStudentClass()}</span>
+            <span>|</span>
+            <span>ROLL NO: {getRollNumber()}</span>
+          </div>
+          <div className="mt-2 text-sm text-gray-500">
+            Current Term: {currentTerm.term} ({currentTerm.months} {currentTerm.year})
           </div>
         </div>
         <button className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-all">
@@ -55,7 +126,9 @@ const AcademicRecords = () => {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4">
           <div className="flex items-center gap-2 mb-2 md:mb-0">
             <BookOpen className="w-5 h-5 text-blue-600" />
-            <h2 className="text-xl font-semibold">TERM 1 REPORT (Aug-Oct 2024)</h2>
+            <h2 className="text-xl font-semibold">
+              {currentTerm.term} REPORT ({currentTerm.months} {currentTerm.year})
+            </h2>
           </div>
           <div className="flex gap-6 text-right">
             <div>
@@ -209,7 +282,7 @@ const AcademicRecords = () => {
 
       {/* Performance Analysis */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-        <h2 className="text-xl font-semibold mb-4">Performance Analysis</h2>
+        <h2 className="text-xl font-semibold mb-4">Performance Analysis - {getStudentName()}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3">
             <div className="bg-blue-100 p-2 rounded-lg">

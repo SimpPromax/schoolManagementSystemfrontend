@@ -9,8 +9,61 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext'; // Import useAuth
 
 const TeacherDashboard = () => {
+  const { user, isAuthenticated } = useAuth(); // Get user from AuthContext
+
+  // Get current school year (based on academic calendar)
+  const getSchoolYear = () => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-12 (January = 1)
+    
+    // School year typically starts in January
+    // If current month is January (1) or later, school year is currentYear-currentYear+1
+    // Example: In March 2026 -> 2026-2027
+    if (currentMonth >= 1) {
+      return `${currentYear}-${currentYear + 1}`;
+    } else {
+      return `${currentYear - 1}-${currentYear}`;
+    }
+  };
+
+  // Get user display name
+  const getUserDisplayName = () => {
+    if (user?.fullName) return user.fullName;
+    if (user?.username) return user.username;
+    if (user?.email) return user.email.split('@')[0];
+    return 'Teacher';
+  };
+
+  // Get user role display
+  const getUserRoleDisplay = () => {
+    if (!user?.role) return 'Mathematics Department';
+    
+    // If user has a department/subject in their profile
+    if (user?.department) return `${user.department} Department`;
+    if (user?.subject) return `${user.subject} Department`;
+    
+    // Capitalize and format the role
+    const role = user.role.toLowerCase();
+    if (role === 'teacher') return 'Teaching Staff';
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+  };
+
+  // Get user experience (if available)
+  const getUserExperience = () => {
+    if (user?.experience) return `${user.experience} years`;
+    if (user?.joinDate) {
+      const joinYear = new Date(user.joinDate).getFullYear();
+      const currentYear = new Date().getFullYear();
+      const years = currentYear - joinYear;
+      return `${years} years`;
+    }
+    return '5 years'; // fallback
+  };
+
   const classes = [
     { grade: 'Grade 10', section: 'A', students: 35, schedule: 'Mon,Wed,Fri(8:30)', subject: 'Mathematics' },
     { grade: 'Grade 10', section: 'B', students: 32, schedule: 'Tue,Thu(9:30)', subject: 'Mathematics' },
@@ -42,6 +95,9 @@ const TeacherDashboard = () => {
     { title: 'Exam Paper Setting Deadline', date: 'March 25', type: 'urgent' },
   ];
 
+  // Calculate total students
+  const totalStudents = classes.reduce((acc, cls) => acc + cls.students, 0);
+
   // Helper: get badge style based on type
   const getBadgeStyle = (type) => {
     switch (type) {
@@ -57,30 +113,44 @@ const TeacherDashboard = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+      {/* Header with Dynamic User Info */}
       <div className="bg-white rounded-xl shadow p-6">
         <div className="flex flex-col md:flex-row justify-between items-start gap-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Springfield High - Teacher Dashboard</h1>
-            <p className="text-gray-600 mt-2">Welcome, Ms. Priya Sharma (Mathematics Department)</p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Ig-BesthoodAcademy - Teacher Dashboard
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Welcome, {getUserDisplayName()} ({getUserRoleDisplay()})
+            </p>
             <div className="flex flex-wrap items-center gap-3 mt-3">
-              <span className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full">Experience: 5 years</span>
-              <span className="text-sm bg-green-100 text-green-800 px-3 py-1 rounded-full">Teacher ID: TCH2020008</span>
+              <span className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                Experience: {getUserExperience()}
+              </span>
+
+              {user?.email && (
+                <span className="text-sm bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                  {user.email}
+                </span>
+              )}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-lg font-bold text-gray-900">120</div>
+            <div className="text-lg font-bold text-gray-900">{totalStudents}</div>
             <div className="text-sm text-gray-600">Total Students</div>
+            <div className="text-xs text-gray-500 mt-1">
+              Last login: {new Date().toLocaleDateString()}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* My Classes - TABLE VERSION */}
+      {/* My Classes - TABLE VERSION with Dynamic School Year */}
       <div className="bg-white rounded-xl shadow p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Users className="w-5 h-5 text-gray-500" />
-            MY CLASSES (2024-2025)
+            MY CLASSES ({getSchoolYear()})
           </h2>
           <Link to="/teacher/gradebook" className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline">
             View Gradebooks →
@@ -137,7 +207,7 @@ const TeacherDashboard = () => {
         </div>
         
         <div className="mt-6 pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-between text-sm text-gray-600">
-          <span>TOTAL STUDENTS: 120</span>
+          <span>TOTAL STUDENTS: {totalStudents}</span>
           <span>TOTAL PERIODS: 20/week</span>
         </div>
       </div>
@@ -149,7 +219,7 @@ const TeacherDashboard = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-gray-500" />
-              Today's Schedule (Monday)
+              Today's Schedule ({new Date().toLocaleDateString('en-US', { weekday: 'long' })})
             </h2>
             <button className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline">
               View Full Week →
@@ -232,7 +302,7 @@ const TeacherDashboard = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="text-sm">
                     <span className="text-gray-600">Submissions: </span>
-                    <span className="font-medium">{assignment.submissions}/{assignment.pending > 0 ? assignment.pending : 'All'}</span>
+                    <span className="font-medium">{assignment.submissions - assignment.pending}/{assignment.submissions}</span>
                   </div>
                   {assignment.pending > 0 ? (
                     <Link 
